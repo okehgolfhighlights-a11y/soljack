@@ -1,5 +1,5 @@
-import { FastifyRequest, FastifyReply } from "fastify";
-import { getCache, setCache } from "../cache";
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { getCache, setCache } from '../cache';
 
 interface LeaderboardQuery {
   limit?: string;
@@ -10,26 +10,26 @@ export async function getLeaderboard(
   reply: FastifyReply
 ) {
   try {
-    const limit = parseInt(request.query.limit ?? "100", 10);
+    const limit = parseInt(request.query.limit || '100');
 
-    const cacheKey = 'leaderboard:${limit}';
+    // Check cache
+    const cacheKey = `leaderboard:${limit}`;
     const cached = await getCache(cacheKey);
-
     if (cached) {
-      return { entries: JSON.parse(cached) };
+      return reply.send(JSON.parse(cached));
     }
 
-    /**
-     * 🔥 RESET STATE
-     * No database yet = empty leaderboard
-     */
-    const entries: any[] = [];
+    // TODO: Query database for actual leaderboard
+    const leaderboard: any[] = [];
+
+    const response = { leaderboard };
 
     // Cache for 30 seconds
-    await setCache(cacheKey, JSON.stringify(entries), 30);
+    await setCache(cacheKey, JSON.stringify(response), 30);
 
-    return { entries };
+    return reply.send(response);
   } catch (error) {
-    reply.code(500).send({ error: "Failed to fetch leaderboard" });
+    console.error('Error fetching leaderboard:', error);
+    return reply.code(500).send({ error: 'Failed to fetch leaderboard' });
   }
 }

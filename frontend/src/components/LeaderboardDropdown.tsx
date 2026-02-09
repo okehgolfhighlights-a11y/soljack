@@ -1,8 +1,7 @@
-import React from "react";
+import { useState, useEffect } from 'react';
 
 interface Props {
   onClose: () => void;
-  entries: LeaderboardEntry[];
 }
 
 interface LeaderboardEntry {
@@ -14,55 +13,55 @@ interface LeaderboardEntry {
   totalHands: number;
 }
 
-export default function LeaderboardDropdown({ onClose, entries }: Props) {
+export default function LeaderboardDropdown({ onClose }: Props) {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/leaderboard?limit=10`);
+      const data = await response.json();
+      setLeaderboard(data.leaderboard || []);
+    } catch (error) {
+      console.error('Failed to fetch leaderboard:', error);
+      setLeaderboard([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
-      {/* Backdrop */}
-      <div
-        style={styles.backdrop}
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div
-        style={styles.panel}
-        onClick={(e) => e.stopPropagation()} // 🚨 CRITICAL FIX
-      >
-        {/* Header */}
+      <div style={styles.backdrop} onClick={onClose} />
+      <div style={styles.dropdown}>
         <div style={styles.header}>
-          <strong>🏆 Leaderboard</strong>
-          <button style={styles.closeButton} onClick={onClose}>
-            ✕
-          </button>
+          <h3 style={styles.title}>🏆 Leaderboard</h3>
+          <button style={styles.closeButton} onClick={onClose}>×</button>
         </div>
-
-        {/* Empty state */}
-        {entries.length === 0 && (
-          <div style={styles.empty}>No games played yet</div>
-        )}
-
-        {/* Entries */}
         <div style={styles.list}>
-          {entries.map((entry) => (
-            <div key={entry.rank} style={styles.entry}>
-              <div style={styles.rankBadge}>{entry.rank}</div>
-
-              <div style={styles.playerInfo}>
-                <div
-                  style={
-                    entry.username ? styles.username : styles.wallet
-                  }
-                >
-                  {entry.username ??
-                    entry.wallet.slice(0, 6) + "..."}
-                </div>
-
-                <div style={styles.record}>
-                  {entry.wins}W – {entry.losses}L
+          {loading ? (
+            <div style={styles.loading}>Loading...</div>
+          ) : leaderboard.length === 0 ? (
+            <div style={styles.empty}>No players yet</div>
+          ) : (
+            leaderboard.map((entry) => (
+              <div key={entry.rank} style={styles.entry}>
+                <div style={styles.rankBadge}>#{entry.rank}</div>
+                <div style={styles.playerInfo}>
+                  <div style={entry.username ? styles.username : styles.wallet}>
+                    {entry.username || `${entry.wallet.slice(0, 4)}...${entry.wallet.slice(-4)}`}
+                  </div>
+                  <div style={styles.record}>
+                    {entry.wins}W - {entry.losses}L
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </>
@@ -71,97 +70,112 @@ export default function LeaderboardDropdown({ onClose, entries }: Props) {
 
 const styles: { [key: string]: React.CSSProperties } = {
   backdrop: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.25)",
-    zIndex: 9999,
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 998,
   },
-
-  panel: {
-    position: "fixed",
-    top: "90px",
-    left: "16px",
-    width: "320px",
-    maxHeight: "70vh",
-    overflowY: "auto",
-    background: "rgba(255,255,255,0.96)",
-    backdropFilter: "blur(12px)",
-    borderRadius: "16px",
-    padding: "12px",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-    zIndex: 10000, // 🚨 ABOVE EVERYTHING
-    color: "#111",
+  dropdown: {
+    position: 'fixed',
+    top: '80px',
+    left: '20px',
+    width: '320px',
+    background: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+    zIndex: 999,
+    maxHeight: '500px',
+    display: 'flex',
+    flexDirection: 'column',
   },
-
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "12px",
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px',
+    borderBottom: '1px solid #e0e0e0',
   },
-
+  title: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#333',
+    margin: 0,
+  },
   closeButton: {
-    background: "none",
-    border: "none",
-    fontSize: "18px",
-    cursor: "pointer",
-    color: "#999",
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    cursor: 'pointer',
+    color: '#999',
+    padding: 0,
+    width: '30px',
+    height: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  empty: {
-    opacity: 0.6,
-    textAlign: "center",
-    padding: "16px",
-    fontSize: "14px",
-  },
-
   list: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
+    maxHeight: '400px',
+    overflowY: 'auto',
   },
-
   entry: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    padding: "10px",
-    borderRadius: "12px",
-    background: "#f5f6fa",
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    padding: '15px 20px',
+    borderBottom: '1px solid #f0f0f0',
   },
-
   rankBadge: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #667eea, #764ba2)",
-    color: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold",
-    fontSize: "14px",
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px',
+    flexShrink: 0,
   },
-
   playerInfo: {
     flex: 1,
+    minWidth: 0,
   },
-
   username: {
-    fontWeight: "bold",
-    fontSize: "15px",
-    background: "linear-gradient(135deg, #ff7a18, #ffdd00)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
+    fontSize: '16px',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    marginBottom: '3px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-
   wallet: {
-    fontSize: "14px",
-    color: "#555",
+    fontSize: '16px',
+    fontWeight: 600,
+    color: '#555',
+    marginBottom: '3px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-
   record: {
-    fontSize: "13px",
-    color: "#666",
+    fontSize: '14px',
+    color: '#666',
+  },
+  loading: {
+    padding: '40px',
+    textAlign: 'center',
+    color: '#999',
+  },
+  empty: {
+    padding: '40px',
+    textAlign: 'center',
+    color: '#999',
   },
 };

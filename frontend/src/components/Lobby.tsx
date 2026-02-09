@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
-import { PublicKey } from '@solana/web3.js';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { useGame } from '../context/GameContext';
-import { useGameProgram, findTablePda, FEE_DESTINATION, SystemProgram, BN } from '../lib/anchor';
 
 interface OpenTable {
   tableId: string;
@@ -25,92 +22,39 @@ interface Props {
 }
 
 export default function Lobby({ betTier }: Props) {
-  const { publicKey } = useWallet();
-  const program = useGameProgram();
   const [openTables, setOpenTables] = useState<OpenTable[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateTable, setShowCreateTable] = useState(false);
-  const [joiningTable, setJoiningTable] = useState<string | null>(null);
   const { setCurrentTableId } = useGame();
 
   useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${apiUrl}/tables/open?betAmount=${Math.floor(betTier * 1e9)}`);
-        if (!response.ok) {
-          console.warn('Failed to fetch tables from backend');
-          return;
-        }
-        const data = await response.json();
-        setOpenTables(data.tables || []);
-      } catch (error) {
-        console.error('Error fetching tables:', error);
-        setOpenTables([]);
-      }
-    };
-
     fetchTables();
-
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchTables, 5000);
+    const interval = setInterval(fetchTables, 5000); // Refresh every 5s
     return () => clearInterval(interval);
   }, [betTier]);
+
+  const fetchTables = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/tables/open?betAmount=${betTier * 1e9}`
+      );
+      const data = await response.json();
+      setOpenTables(data.tables || []);
+    } catch (error) {
+      console.error('Failed to fetch tables:', error);
+      setOpenTables([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateTable = () => {
     setShowCreateTable(true);
   };
 
   const handleJoinTable = async (tableId: string) => {
-    if (!publicKey || !program) {
-      alert('Please connect your wallet');
-      return;
-    }
-
-    setJoiningTable(tableId);
-
-    try {
-      // The tableId IS the table PDA address
-      const tablePda = new PublicKey(tableId);
-
-      // Fetch table account to get creator address
-      const tableAccount = await program.account.tableAccount.fetch(tablePda);
-      const creatorPubkey = tableAccount.creator;
-
-      console.log('Joining table:', tableId);
-      console.log('Creator:', creatorPubkey.toString());
-
-      // Call join_table instruction
-      const tx = await program.methods
-        .joinTable()
-        .accounts({
-          opponent: publicKey,
-          creator: creatorPubkey,
-          tableAccount: tablePda,
-          feeDestination: FEE_DESTINATION,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      console.log('Joined table! Transaction:', tx);
-
-      // Navigate to table view
-      setCurrentTableId(tableId);
-    } catch (err: any) {
-      console.error('Failed to join table:', err);
-
-      let errorMsg = 'Failed to join table';
-      if (err.message?.includes('insufficient')) {
-        errorMsg = 'Insufficient SOL balance';
-      } else if (err.message?.includes('full')) {
-        errorMsg = 'Table is full';
-      } else if (err.message) {
-        errorMsg = err.message;
-      }
-
-      alert(errorMsg);
-    } finally {
-      setJoiningTable(null);
-    }
+    // TODO: Call join_table instruction
+    setCurrentTableId(tableId);
   };
 
   return (
@@ -130,42 +74,42 @@ export default function Lobby({ betTier }: Props) {
         />
       )}
 
-      <div style={styles.tableGrid}>
-        {openTables.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p>No open tables at this bet tier.</p>
-            <p>Be the first to create one!</p>
-          </div>
-        ) : (
-          openTables.map((table) => (
-            <TableCard
-              key={table.tableId}
-              table={table}
-              onJoin={handleJoinTable}
-              isJoining={joiningTable === table.tableId}
-            />
-          ))
-        )}
-      </div>
+      {loading ? (
+        <div style={styles.loading}>Loading tables...</div>
+      ) : (
+        <div style={styles.tableGrid}>
+          {openTables.length === 0 ? (
+            <div style={styles.emptyState}>
+              <p>No open tables at this bet tier.</p>
+              <p>Be the first to create one!</p>
+            </div>
+          ) : (
+            openTables.map((table) => (
+              <TableCard
+                key={table.tableId}
+                table={table}
+                onJoin={handleJoinTable}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
+function TableCard({ table, onJoin }: { table: OpenTable; onJoin: (id: string) => void }) {
   const formatTime = (seconds: number) => {
-    return `${Math.floor(seconds / 60)}:${(seconds % 60)
-      .toString()
-      .padStart(2, '0')}`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div
-      style={{...styles.tableCard, opacity: isJoining ? 0.6 : 1}}
-      onClick={() => !isJoining && onJoin(table.tableId)}
-    >
+    <div style={styles.tableCard} onClick={() => onJoin(table.tableId)}>
       <div style={styles.cardHeader}>
-        <span style={styles.username}>
-          {table.creatorUsername || table.creator.slice(0, 5) + '...'}
+        <span style={table.creatorUsername ? styles.usernameGold : styles.usernameDefault}>
+          {table.creatorUsername || `${table.creator.slice(0, 4)}...${table.creator.slice(-4)}`}
         </span>
         <span style={styles.timer}>{formatTime(table.timeRemaining)}</span>
       </div>
@@ -175,7 +119,7 @@ function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id
           <div style={styles.seatLabel}>DEALER</div>
           {table.creatorRole === 'DEALER' && (
             <div style={styles.playerInfo}>
-              {table.creatorUsername || table.creator.slice(0, 5) + '...'}
+              {table.creatorUsername || `${table.creator.slice(0, 4)}...`}
             </div>
           )}
         </div>
@@ -186,7 +130,7 @@ function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id
           <div style={styles.seatLabel}>PLAYER</div>
           {table.creatorRole === 'PLAYER' && (
             <div style={styles.playerInfo}>
-              {table.creatorUsername || table.creator.slice(0, 5) + '...'}
+              {table.creatorUsername || `${table.creator.slice(0, 4)}...`}
             </div>
           )}
         </div>
@@ -211,64 +155,22 @@ function CreateTableModal({
   onClose: () => void;
   onCreated: (tableId: string) => void;
 }) {
-  const { publicKey } = useWallet();
-  const program = useGameProgram();
   const [selectedRole, setSelectedRole] = useState<'DEALER' | 'PLAYER' | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!selectedRole || !publicKey || !program) return;
-
-    setIsCreating(true);
-    setError('');
-
+    if (!selectedRole) return;
+    
+    setCreating(true);
     try {
-      // Generate a unique table seed based on timestamp
-      const tableSeed = new BN(Date.now());
-
-      // Convert bet tier (in SOL) to lamports
-      const betAmountLamports = new BN(betTier * 1e9);
-
-      // Find table PDA
-      const [tablePda] = findTablePda(program.programId, tableSeed);
-
-      console.log('Creating table...');
-      console.log('Table PDA:', tablePda.toString());
-      console.log('Bet amount:', betAmountLamports.toString(), 'lamports');
-      console.log('Role:', selectedRole);
-
-      // Create role enum object
-      const role = selectedRole === 'DEALER' ? { dealer: {} } : { player: {} };
-
-      // Call create_table instruction
-      const tx = await program.methods
-        .createTable(betAmountLamports, role, tableSeed)
-        .accounts({
-          creator: publicKey,
-          tableAccount: tablePda,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      console.log('Table created! Transaction:', tx);
-
-      // Use the table PDA as the table ID
-      onCreated(tablePda.toString());
+      // TODO: Call create_table instruction
+      const mockTableId = 'table_' + Date.now();
+      onCreated(mockTableId);
       onClose();
-    } catch (err: any) {
-      console.error('Failed to create table:', err);
-
-      let errorMsg = 'Failed to create table';
-      if (err.message?.includes('insufficient')) {
-        errorMsg = 'Insufficient SOL balance';
-      } else if (err.message) {
-        errorMsg = err.message;
-      }
-
-      setError(errorMsg);
+    } catch (error) {
+      console.error('Failed to create table:', error);
     } finally {
-      setIsCreating(false);
+      setCreating(false);
     }
   };
 
@@ -285,6 +187,7 @@ function CreateTableModal({
               background: selectedRole === 'DEALER' ? '#90caf9' : 'rgba(255, 255, 255, 0.5)',
             }}
             onClick={() => setSelectedRole('DEALER')}
+            disabled={creating}
           >
             DEALER
           </button>
@@ -294,23 +197,22 @@ function CreateTableModal({
               background: selectedRole === 'PLAYER' ? '#90caf9' : 'rgba(255, 255, 255, 0.5)',
             }}
             onClick={() => setSelectedRole('PLAYER')}
+            disabled={creating}
           >
             PLAYER
           </button>
         </div>
 
-        {error && <div style={{ color: '#f44336', marginBottom: '10px', fontSize: '14px' }}>{error}</div>}
-
         <div style={styles.modalActions}>
-          <button style={styles.cancelButton} onClick={onClose} disabled={isCreating}>
+          <button style={styles.cancelButton} onClick={onClose} disabled={creating}>
             Back
           </button>
           <button
             style={styles.confirmButton}
             onClick={handleCreate}
-            disabled={!selectedRole || isCreating}
+            disabled={!selectedRole || creating}
           >
-            {isCreating ? 'Creating...' : 'Create Table'}
+            {creating ? 'Creating...' : 'Create Table'}
           </button>
         </div>
       </div>
@@ -346,6 +248,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
   },
+  loading: {
+    textAlign: 'center',
+    padding: '60px',
+    fontSize: '18px',
+    color: '#666',
+  },
   tableGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
@@ -372,7 +280,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'space-between',
     marginBottom: '15px',
   },
-  username: {
+  usernameGold: {
+    fontSize: '16px',
+    fontWeight: 600,
+    background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  usernameDefault: {
     fontSize: '16px',
     fontWeight: 600,
     color: '#333',

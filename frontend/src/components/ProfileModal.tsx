@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useGame } from '../context/GameContext';
 
 interface Props {
@@ -13,21 +15,38 @@ interface HandHistory {
 }
 
 export default function ProfileModal({ onClose }: Props) {
+  const { publicKey } = useWallet();
   const { username, stats } = useGame();
-  
-  // Mock data
-  const recentHands: HandHistory[] = [
-    { tableId: '123', outcome: 'WIN', role: 'DEALER', betAmount: 0.1, timestamp: Date.now() - 3600000 },
-    { tableId: '124', outcome: 'LOSS', role: 'PLAYER', betAmount: 0.1, timestamp: Date.now() - 7200000 },
-    { tableId: '125', outcome: 'WIN', role: 'DEALER', betAmount: 0.05, timestamp: Date.now() - 10800000 },
-  ];
+  const [recentHands, setRecentHands] = useState<HandHistory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (publicKey) {
+      fetchPlayerStats();
+    }
+  }, [publicKey]);
+
+  const fetchPlayerStats = async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/player/${publicKey!.toString()}/stats`
+      );
+      const data = await response.json();
+      setRecentHands(data.recentHands || []);
+    } catch (error) {
+      console.error('Failed to fetch player stats:', error);
+      setRecentHands([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatTime = (timestamp: number) => {
     const diff = Date.now() - timestamp;
     const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return '${Math.floor(diff / 60000)}m ago';
-    if (hours < 24) return '${hours}h ago';
-    return '${Math.floor(hours / 24)}d ago';
+    if (hours < 1) return `${Math.floor(diff / 60000)}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
   };
 
   return (
@@ -55,14 +74,16 @@ export default function ProfileModal({ onClose }: Props) {
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Rank</div>
             <div style={styles.statValue}>
-              {stats.rank ? '#${stats.rank}' : 'Unranked'}
+              {stats.rank ? `#${stats.rank}` : 'Unranked'}
             </div>
           </div>
         </div>
 
         <div style={styles.historySection}>
           <h3 style={styles.historyTitle}>Last 5 Hands</h3>
-          {recentHands.length === 0 ? (
+          {loading ? (
+            <div style={styles.loading}>Loading...</div>
+          ) : recentHands.length === 0 ? (
             <div style={styles.emptyHistory}>No hands played yet</div>
           ) : (
             <div style={styles.historyList}>
@@ -78,7 +99,7 @@ export default function ProfileModal({ onClose }: Props) {
                     <span style={styles.role}>{hand.role}</span>
                   </div>
                   <div style={styles.historyRight}>
-                    <span style={styles.betAmount}>{hand.betAmount} SOL</span>
+                    <span style={styles.betAmount}>{(hand.betAmount / 1e9).toFixed(2)} SOL</span>
                     <span style={styles.timestamp}>{formatTime(hand.timestamp)}</span>
                   </div>
                 </div>
@@ -167,6 +188,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: 'bold',
     marginBottom: '15px',
     color: '#333',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#999',
   },
   emptyHistory: {
     textAlign: 'center',

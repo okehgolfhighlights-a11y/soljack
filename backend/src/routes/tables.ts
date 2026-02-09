@@ -1,5 +1,4 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { getCache } from '../cache';
 
 interface OpenTablesQuery {
   betAmount?: string;
@@ -17,31 +16,16 @@ export async function getOpenTables(
     const betAmount = request.query.betAmount;
 
     // TODO: Query blockchain/database for open tables
-    const tables = [
-      {
-        tableId: '12345',
-        betAmount: 100000000,
-        creator: '7KwQDkHVKGJ5BQ89JN83XeG1kvWdFHhf7QH5o67jiym4',
-        creatorUsername: 'SolanaQueen',
-        creatorRole: 'DEALER',
-        openRole: 'PLAYER',
-        creatorStats: {
-          wins: 45,
-          losses: 18,
-          totalHands: 63,
-        },
-        timeRemaining: 142,
-        createdAt: Date.now() - 38000,
-      },
-    ];
+    const tables: any[] = [];
 
     const filtered = betAmount
       ? tables.filter((t) => t.betAmount.toString() === betAmount)
       : tables;
 
-    return { tables: filtered };
+    return reply.send({ tables: filtered });
   } catch (error) {
-    reply.code(500).send({ error: 'Failed to fetch open tables' });
+    console.error('Error fetching open tables:', error);
+    return reply.code(500).send({ error: 'Failed to fetch open tables' });
   }
 }
 
@@ -53,25 +37,9 @@ export async function getTableById(
     const { tableId } = request.params;
 
     // TODO: Query blockchain for table data
-    const table = {
-      tableId,
-      state: 'ACTIVE',
-      betAmount: 100000000,
-      creator: '7KwQDkHVKGJ5BQ89JN83XeG1kvWdFHhf7QH5o67jiym4',
-      opponent: '9XmT5pQr8uYnLmKp3NbVwZxRtCdEfGhIj4AsBcDeF1Gh',
-      creatorRole: 'DEALER',
-      handNumber: 3,
-      currentTurn: 'PLAYER',
-      turnDeadline: Date.now() + 45000,
-      creatorHand: [10, 7],
-      opponentHand: [3, 8, 5],
-      creatorTotal: 17,
-      opponentTotal: 16,
-      deckRemaining: 38,
-    };
-
-    return table;
+    return reply.code(404).send({ error: 'Table not found' });
   } catch (error) {
-    reply.code(404).send({ error: 'Table not found' });
+    console.error('Error fetching table:', error);
+    return reply.code(500).send({ error: 'Failed to fetch table' });
   }
 }

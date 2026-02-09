@@ -4,7 +4,8 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Header from './Header';
 import BetTierNav from './BetTierNav';
 import Lobby from './Lobby';
-import TableSimple from './TableSimple';
+import Table from './Tables';
+import PracticeTable from './PracticeTable';
 import HowItWorks from './HowItWorks';
 import Stats from './Stats';
 import { useGame } from '../context/GameContext';
@@ -13,6 +14,7 @@ export default function HomePage() {
   const { connected } = useWallet();
   const { isAtTable } = useGame();
   const [selectedBetTier, setSelectedBetTier] = useState<number | null>(null);
+  const [practiceMode, setPracticeMode] = useState(false);
 
   if (!connected) {
     return (
@@ -40,14 +42,28 @@ export default function HomePage() {
   }
 
   if (isAtTable) {
-    return <TableSimple />;
+    return <Table />;
+  }
+
+  if (practiceMode) {
+    return <PracticeTable onExit={() => setPracticeMode(false)} />;
   }
 
   return (
     <div style={styles.container}>
       <Header />
-      <BetTierNav selectedTier={selectedBetTier} onSelectTier={setSelectedBetTier} />
-      {selectedBetTier && <Lobby betTier={selectedBetTier} />}
+      <BetTierNav 
+        selectedTier={selectedBetTier} 
+        onSelectTier={(tier) => {
+          setSelectedBetTier(tier);
+          setPracticeMode(false);
+        }}
+        onPracticeMode={() => {
+          setSelectedBetTier(null);
+          setPracticeMode(true);
+        }}
+      />
+      {selectedBetTier && selectedBetTier > 0 && <Lobby betTier={selectedBetTier} />}
       <footer style={styles.footer}>
         🏆 First username to 100 wins receives creator rewards from Pump.Fun token launch
       </footer>

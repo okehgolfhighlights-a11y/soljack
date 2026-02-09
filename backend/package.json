@@ -9,17 +9,18 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@solana/web3.js": "^1.87.6",
+    "@coral-xyz/anchor": "^0.29.0",
     "@fastify/cors": "^8.5.0",
-    "fastify": "^4.25.2",
-    "ws": "^8.16.0",
-    "redis": "^4.6.12",
-    "dotenv": "^16.3.1"
+    "@solana/web3.js": "^1.98.4",
+    "dotenv": "^16.6.1",
+    "fastify": "^4.29.1",
+    "redis": "^4.7.1",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.6",
-    "@types/ws": "^8.5.10",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "@types/node": "^20.19.33",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

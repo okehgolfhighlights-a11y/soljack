@@ -16,11 +16,34 @@ export default function Stats() {
     dealerWinRate: 0,
     playerWinRate: 0,
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Fetch from backend API
-    // fetch('/api/stats').then(r => r.json()).then(setStats);
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000); // Refresh every 30s
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/stats`);
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <h3 style={styles.title}>Live Stats</h3>
+        <div style={styles.loading}>Loading stats...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -85,5 +108,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: '24px',
     fontWeight: 'bold',
     color: '#333',
+  },
+  loading: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#999',
   },
 };
