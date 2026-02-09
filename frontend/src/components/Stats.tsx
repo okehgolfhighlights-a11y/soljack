@@ -10,11 +10,11 @@ interface PlatformStats {
 
 export default function Stats() {
   const [stats, setStats] = useState<PlatformStats>({
-    totalHands: 15234,
-    activeTables: 12,
-    totalVolume: 1234.56,
-    dealerWinRate: 0.48,
-    playerWinRate: 0.47,
+    totalHands: 0,
+    activeTables: 0,
+    totalVolume: 0,
+    dealerWinRate: 0,
+    playerWinRate: 0,
   });
 
   useEffect(() => {

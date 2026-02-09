@@ -1,6 +1,12 @@
-import { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useUsernameProgram, findUsernamePda, findWalletPda, FEE_DESTINATION, SystemProgram } from '../lib/anchor';
+import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import {
+  useUsernameProgram,
+  findUsernamePda,
+  findWalletPda,
+  FEE_DESTINATION,
+  SystemProgram,
+} from "../lib/anchor";
 
 interface Props {
   onClose: () => void;
@@ -9,41 +15,33 @@ interface Props {
 export default function UsernameModal({ onClose }: Props) {
   const { publicKey } = useWallet();
   const program = useUsernameProgram();
-  const [username, setUsername] = useState('');
-  const [error, setError] = useState('');
+
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!publicKey) return;
+    if (!publicKey || !program) return;
 
-    // Validation
+    setError("");
+
     if (username.length < 3 || username.length > 20) {
-      setError('Username must be 3-20 characters');
+      setError("Username must be 3–20 characters");
       return;
     }
 
     if (!/^[a-zA-Z0-9]+$/.test(username)) {
-      setError('Only letters and numbers allowed');
-      return;
-    }
-
-    if (!program) {
-      setError('Wallet not connected');
+      setError("Only letters and numbers allowed");
       return;
     }
 
     setIsSubmitting(true);
+
     try {
-      // Find PDAs
       const [usernamePda] = findUsernamePda(program.programId, username);
       const [walletPda] = findWalletPda(program.programId, publicKey);
 
-      console.log('Claiming username:', username);
-      console.log('Username PDA:', usernamePda.toString());
-      console.log('Wallet PDA:', walletPda.toString());
-
-      // Call claim_username instruction
-      const tx = await program.methods
+      await program.methods
         .claimUsername(username)
         .accounts({
           user: publicKey,
@@ -54,159 +52,71 @@ export default function UsernameModal({ onClose }: Props) {
         })
         .rpc();
 
-      console.log('Username claimed! Transaction:', tx);
-
-      // Refresh page to update context
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-
       onClose();
     } catch (err: any) {
-      console.error('Failed to claim username:', err);
+      const msg = String(err?.message || err);
 
-      // Parse error message
-      let errorMsg = 'Failed to claim username';
-      if (err.message?.includes('already in use')) {
-        errorMsg = 'Username already taken';
-      } else if (err.message?.includes('insufficient')) {
-        errorMsg = 'Insufficient SOL balance';
-      } else if (err.message) {
-        errorMsg = err.message;
+      if (msg.includes("insufficient")) {
+        setError("Insufficient SOL balance");
+      } else if (msg.includes("already in use")) {
+        setError("Username already taken");
+      } else {
+        setError("Transaction failed");
       }
-
-      setError(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h2 style={styles.title}>Claim Username</h2>
-        <p style={styles.description}>
-          Cost: $1 USD in SOL (one-time payment)
-          <br />
-          Permanent and unique. Letters and numbers only.
-        </p>
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        zIndex: 2000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white",
+          padding: "40px",
+          borderRadius: "16px",
+          width: "90%",
+          maxWidth: "500px",
+        }}
+      >
+        <h2>Claim Username</h2>
+        <p>Cost: $1 USD in SOL (one-time)</p>
 
         <input
-          type="text"
           value={username}
           onChange={(e) => {
             setUsername(e.target.value);
-            setError('');
+            setError("");
           }}
           placeholder="Enter username"
-          style={styles.input}
           maxLength={20}
+          style={{ width: "100%", padding: "15px", fontSize: "16px" }}
         />
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && <div style={{ color: "#f44336" }}>{error}</div>}
 
-        <div style={styles.benefits}>
-          <div style={styles.benefit}>✨ Display name in gold</div>
-          <div style={styles.benefit}>🏆 Eligible for 100-win race</div>
-          <div style={styles.benefit}>🎯 Permanent identity</div>
-        </div>
-
-        <div style={styles.actions}>
-          <button style={styles.cancelButton} onClick={onClose}>
-            Cancel
-          </button>
+        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+          <button onClick={onClose}>Cancel</button>
           <button
-            style={styles.submitButton}
             onClick={handleSubmit}
             disabled={isSubmitting || !username}
           >
-            {isSubmitting ? 'Claiming...' : 'Claim for $1'}
+            {isSubmitting ? "Claiming…" : "Claim for $1"}
           </button>
         </div>
       </div>
     </div>
   );
 }
-
-const styles: { [key: string]: React.CSSProperties } = {
-  overlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-  },
-  modal: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '40px',
-    maxWidth: '500px',
-    width: '90%',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    color: '#333',
-  },
-  description: {
-    fontSize: '16px',
-    color: '#666',
-    marginBottom: '30px',
-    lineHeight: '1.6',
-  },
-  input: {
-    width: '100%',
-    padding: '15px',
-    fontSize: '18px',
-    border: '2px solid #e0e0e0',
-    borderRadius: '8px',
-    marginBottom: '10px',
-    outline: 'none',
-  },
-  error: {
-    color: '#f44336',
-    fontSize: '14px',
-    marginBottom: '20px',
-  },
-  benefits: {
-    background: 'rgba(144, 202, 249, 0.1)',
-    borderRadius: '8px',
-    padding: '20px',
-    marginBottom: '30px',
-  },
-  benefit: {
-    fontSize: '16px',
-    marginBottom: '10px',
-    color: '#555',
-  },
-  actions: {
-    display: 'flex',
-    gap: '10px',
-  },
-  cancelButton: {
-    flex: 1,
-    padding: '15px',
-    background: 'rgba(0, 0, 0, 0.1)',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  submitButton: {
-    flex: 1,
-    padding: '15px',
-    background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-};
