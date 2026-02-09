@@ -39,7 +39,7 @@ export default function LeaderboardDropdown({ onClose }: Props) {
       <div style={styles.backdrop} onClick={onClose} />
       <div style={styles.dropdown}>
         <div style={styles.header}>
-          <h3 style={styles.title}>🏆 Leaderboard</h3>
+          <h3 style={styles.title}>Leaderboard</h3>
           <button style={styles.closeButton} onClick={onClose}>×</button>
         </div>
         <div style={styles.list}>
