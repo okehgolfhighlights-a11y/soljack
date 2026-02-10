@@ -1,6 +1,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+import { getCache, setCache } from '../cache';
+>>>>>>> Stashed changes
 =======
 import { getCache, setCache } from '../cache';
 >>>>>>> Stashed changes
@@ -21,7 +25,10 @@ export async function getPlayerStats(
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
     // Check cache
@@ -32,6 +39,9 @@ export async function getPlayerStats(
     }
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -45,6 +55,7 @@ export async function getPlayerStats(
       rank: null,
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
       recentHands: [],
     };
 
@@ -55,6 +66,8 @@ export async function getPlayerStats(
   }
 }
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
       totalWagered: 0,
@@ -70,6 +83,9 @@ export async function getPlayerStats(
   }
 }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes

@@ -14,6 +14,9 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useGame } from '../context/GameContext';
 import { useGameProgram, findTablePda, FEE_DESTINATION, SystemProgram, BN } from '../lib/anchor';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -40,6 +43,7 @@ export default function Lobby({ betTier }: Props) {
   const [openTables, setOpenTables] = useState<OpenTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateTable, setShowCreateTable] = useState(false);
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 
@@ -71,6 +75,12 @@ export default function Lobby({ betTier }: Props) {
 
   useEffect(() => {
 >>>>>>> Stashed changes
+=======
+  const [joiningTable, setJoiningTable] = useState<string | null>(null);
+  const { setCurrentTableId } = useGame();
+
+  useEffect(() => {
+>>>>>>> Stashed changes
     const fetchTables = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -85,6 +95,9 @@ export default function Lobby({ betTier }: Props) {
         console.error('Error fetching tables:', error);
         setOpenTables([]);
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -92,6 +105,7 @@ export default function Lobby({ betTier }: Props) {
     };
 
     fetchTables();
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
     const interval = setInterval(fetchTables, 5000);
@@ -105,6 +119,8 @@ export default function Lobby({ betTier }: Props) {
   const handleJoinTable = (tableId: string) => {
     setCurrentTableId(tableId);
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 
@@ -169,6 +185,9 @@ export default function Lobby({ betTier }: Props) {
       setJoiningTable(null);
     }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -238,6 +257,7 @@ export default function Lobby({ betTier }: Props) {
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 /* =======================
    TABLE CARD
 ======================= */
@@ -249,6 +269,9 @@ function TableCard({
   table: OpenTable;
   onJoin: (id: string) => void;
 }) {
+=======
+function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
+>>>>>>> Stashed changes
 =======
 function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
 >>>>>>> Stashed changes
@@ -337,6 +360,7 @@ function CreateTableModal({
 }) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const [role, setRole] = useState<"DEALER" | "PLAYER" | null>(null);
   const [creating, setCreating] = useState(false);
 
@@ -354,6 +378,8 @@ function CreateTableModal({
     } finally {
       setCreating(false);
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
   const { publicKey } = useWallet();
@@ -415,6 +441,9 @@ function CreateTableModal({
     } finally {
       setIsCreating(false);
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -452,9 +481,12 @@ function CreateTableModal({
         <div style={styles.modalActions}>
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
           <button style={styles.cancelButton} onClick={onClose}>
             Cancel
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
           <button style={styles.cancelButton} onClick={onClose} disabled={isCreating}>
@@ -467,8 +499,14 @@ function CreateTableModal({
             onClick={handleCreate}
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
           >
             {creating ? "Creating…" : "Create"}
+=======
+            disabled={!selectedRole || isCreating}
+          >
+            {isCreating ? 'Creating...' : 'Create Table'}
+>>>>>>> Stashed changes
 =======
             disabled={!selectedRole || isCreating}
           >

@@ -1,5 +1,6 @@
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /* =========================
@@ -292,6 +293,8 @@ export default function TableSimple() {
 =======
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
 import { useState, useEffect } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -435,6 +438,9 @@ function ActiveGame({ tableData, tablePda, onLeave }: { tableData: any; tablePda
         Leave Table
       </button>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -442,6 +448,7 @@ function ActiveGame({ tableData, tablePda, onLeave }: { tableData: any; tablePda
   );
 }
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 /* =========================
@@ -627,6 +634,8 @@ const css = `
 }
 `;
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 export default function TableSimple() {
@@ -956,6 +965,9 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes

@@ -13,6 +13,9 @@ import { useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useUsernameProgram, findUsernamePda, findWalletPda, FEE_DESTINATION, SystemProgram } from '../lib/anchor';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -26,10 +29,13 @@ export default function UsernameModal({ onClose }: Props) {
   const program = useUsernameProgram();
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
   const [username, setUsername] = useState('');
@@ -62,9 +68,15 @@ export default function UsernameModal({ onClose }: Props) {
       return;
     }
 
+    if (!program) {
+      setError('Wallet not connected');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
       const [usernamePda] = findUsernamePda(program.programId, username);
@@ -72,6 +84,8 @@ export default function UsernameModal({ onClose }: Props) {
 
       await program.methods
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
       // Find PDAs
@@ -85,6 +99,9 @@ export default function UsernameModal({ onClose }: Props) {
       // Call claim_username instruction
       const tx = await program.methods
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -98,6 +115,7 @@ export default function UsernameModal({ onClose }: Props) {
         })
         .rpc();
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
       onClose();
@@ -132,6 +150,17 @@ export default function UsernameModal({ onClose }: Props) {
       onClose();
     } catch (err: any) {
 >>>>>>> Stashed changes
+=======
+      console.log('Username claimed! Transaction:', tx);
+
+      // Refresh page to update context
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+      onClose();
+    } catch (err: any) {
+>>>>>>> Stashed changes
       console.error('Failed to claim username:', err);
 
       // Parse error message
@@ -146,6 +175,9 @@ export default function UsernameModal({ onClose }: Props) {
 
       setError(errorMsg);
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes

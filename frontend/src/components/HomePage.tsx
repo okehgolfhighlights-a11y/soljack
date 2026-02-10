@@ -6,8 +6,12 @@ import BetTierNav from './BetTierNav';
 import Lobby from './Lobby';
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import Table from './Tables';
 import PracticeTable from './PracticeTable';
+=======
+import TableSimple from './TableSimple';
+>>>>>>> Stashed changes
 =======
 import TableSimple from './TableSimple';
 >>>>>>> Stashed changes
@@ -52,10 +56,13 @@ export default function HomePage() {
   if (isAtTable) {
     return <TableSimple />;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   }
 
   if (practiceMode) {
     return <PracticeTable onExit={() => setPracticeMode(false)} />;
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
   }
