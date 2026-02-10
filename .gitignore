@@ -47,9 +47,6 @@ test-ledger/
 # TypeScript
 *.tsbuildinfo
 
-# Redis
-dump.rdb
-
 # Auto Claude data directory
 .auto-claude/
 
