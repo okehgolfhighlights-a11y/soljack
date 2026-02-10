@@ -4,8 +4,12 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import Header from './Header';
 import BetTierNav from './BetTierNav';
 import Lobby from './Lobby';
+<<<<<<< Updated upstream
 import Table from './Tables';
 import PracticeTable from './PracticeTable';
+=======
+import TableSimple from './TableSimple';
+>>>>>>> Stashed changes
 import HowItWorks from './HowItWorks';
 import Stats from './Stats';
 import { useGame } from '../context/GameContext';
@@ -42,7 +46,7 @@ export default function HomePage() {
   }
 
   if (isAtTable) {
-    return <Table />;
+    return <TableSimple />;
   }
 
   if (practiceMode) {

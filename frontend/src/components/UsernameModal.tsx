@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -7,6 +8,11 @@ import {
   FEE_DESTINATION,
   SystemProgram,
 } from "../lib/anchor";
+=======
+import { useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useUsernameProgram, findUsernamePda, findWalletPda, FEE_DESTINATION, SystemProgram } from '../lib/anchor';
+>>>>>>> Stashed changes
 
 interface Props {
   onClose: () => void;
@@ -15,9 +21,14 @@ interface Props {
 export default function UsernameModal({ onClose }: Props) {
   const { publicKey } = useWallet();
   const program = useUsernameProgram();
+<<<<<<< Updated upstream
 
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
+=======
+  const [username, setUsername] = useState('');
+  const [error, setError] = useState('');
+>>>>>>> Stashed changes
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
@@ -35,13 +46,31 @@ export default function UsernameModal({ onClose }: Props) {
       return;
     }
 
+    if (!program) {
+      setError('Wallet not connected');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+<<<<<<< Updated upstream
       const [usernamePda] = findUsernamePda(program.programId, username);
       const [walletPda] = findWalletPda(program.programId, publicKey);
 
       await program.methods
+=======
+      // Find PDAs
+      const [usernamePda] = findUsernamePda(program.programId, username);
+      const [walletPda] = findWalletPda(program.programId, publicKey);
+
+      console.log('Claiming username:', username);
+      console.log('Username PDA:', usernamePda.toString());
+      console.log('Wallet PDA:', walletPda.toString());
+
+      // Call claim_username instruction
+      const tx = await program.methods
+>>>>>>> Stashed changes
         .claimUsername(username)
         .accounts({
           user: publicKey,
@@ -52,6 +81,7 @@ export default function UsernameModal({ onClose }: Props) {
         })
         .rpc();
 
+<<<<<<< Updated upstream
       onClose();
     } catch (err: any) {
       const msg = String(err?.message || err);
@@ -63,6 +93,30 @@ export default function UsernameModal({ onClose }: Props) {
       } else {
         setError("Transaction failed");
       }
+=======
+      console.log('Username claimed! Transaction:', tx);
+
+      // Refresh page to update context
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+
+      onClose();
+    } catch (err: any) {
+      console.error('Failed to claim username:', err);
+
+      // Parse error message
+      let errorMsg = 'Failed to claim username';
+      if (err.message?.includes('already in use')) {
+        errorMsg = 'Username already taken';
+      } else if (err.message?.includes('insufficient')) {
+        errorMsg = 'Insufficient SOL balance';
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+
+      setError(errorMsg);
+>>>>>>> Stashed changes
     } finally {
       setIsSubmitting(false);
     }
