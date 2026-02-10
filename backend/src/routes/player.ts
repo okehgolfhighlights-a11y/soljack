@@ -1,5 +1,9 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+=======
+import { getCache, setCache } from '../cache';
+>>>>>>> Stashed changes
 =======
 import { getCache, setCache } from '../cache';
 >>>>>>> Stashed changes
@@ -16,7 +20,10 @@ export async function getPlayerStats(
     const { wallet } = request.params;
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
     // Check cache
     const cacheKey = `player:${wallet}:stats`;
     const cached = await getCache(cacheKey);
@@ -24,6 +31,9 @@ export async function getPlayerStats(
       return JSON.parse(cached);
     }
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     // TODO: Query blockchain/database for player stats
     const stats = {
@@ -33,6 +43,7 @@ export async function getPlayerStats(
       losses: 0,
       totalHands: 0,
       rank: null,
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
       recentHands: [],
     };
@@ -44,6 +55,8 @@ export async function getPlayerStats(
   }
 }
 =======
+=======
+>>>>>>> Stashed changes
       totalWagered: 0,
       totalWon: 0,
     };
@@ -56,4 +69,7 @@ export async function getPlayerStats(
     reply.code(500).send({ error: 'Failed to fetch player stats' });
   }
 }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
