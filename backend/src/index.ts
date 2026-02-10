@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 
+import { privateRoutes } from "./routes/private";
 import { config } from './config';
 import { initWebSocket } from './websocket';
 import { registerRoutes } from './routes';

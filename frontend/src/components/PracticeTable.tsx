@@ -1,435 +1,676 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
 
-interface Props {
-  onExit: () => void;
+/* =========================
+   Types
+========================= */
+
+type Suit = "♠️" | "♥️" | "♦️" | "♣️";
+type Rank =
+  | "A"
+  | "2"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K";
+
+type Phase = "playing" | "dealer" | "settle" | "reshuffle";
+
+interface Card {
+  suit: Suit;
+  rank: Rank;
+  id: string;
+  dealtAt: number; // used for animation keys + ordering
 }
 
-export default function PracticeTable({ onExit }: Props) {
-  const [gameState, setGameState] = useState<'PLAYING' | 'SETTLED'>('PLAYING');
-  const [playerHand, setPlayerHand] = useState<number[]>([]);
-  const [dealerHand, setDealerHand] = useState<number[]>([]);
-  const [playerTotal, setPlayerTotal] = useState(0);
-  const [dealerTotal, setDealerTotal] = useState(0);
-  const [currentTurn, setCurrentTurn] = useState<'DEALER' | 'PLAYER'>('PLAYER');
-  const [deck, setDeck] = useState<number[]>([]);
-  const [deckIndex, setDeckIndex] = useState(0);
-  const [dealerHoleCard, setDealerHoleCard] = useState<number | null>(null);
-  const [result, setResult] = useState<'WIN' | 'LOSS' | 'PUSH' | null>(null);
+/* =========================
+   Deck Helpers
+========================= */
+
+const SUITS: Suit[] = ["♠️", "♥️", "♦️", "♣️"];
+const RANKS: Rank[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+
+function buildDeck(): Card[] {
+  const deck: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({
+        suit,
+        rank,
+        id: '${rank}${suit}-${Math.random().toString(16).slice(2)}',
+        dealtAt: 0,
+      });
+    }
+  }
+  return shuffle(deck);
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function cardValue(rank: Rank): number {
+  if (rank === "A") return 11;
+  if (rank === "K" || rank === "Q" || rank === "J") return 10;
+}
+
+function handValue(cards: Card[]): number {
+  let total = 0;
+  let aces = 0;
+
+  for (const c of cards) {
+    total += cardValue(c.rank);
+    if (c.rank === "A") aces++;
+  }
+
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces--;
+  }
+
+  return total;
+}
+
+/* =========================
+   UI: Card
+========================= */
+
+function PlayingCard({ card, index, fanDeg }: { card: Card; index: number; fanDeg: number }) {
+  const red = card.suit === "♥️" || card.suit === "♦️";
+
+  // Fan + slight spread
+  const spreadX = index * 18;
+  const rotate = index * fanDeg;
+
+  return (
+    <div
+      className="sj-card"
+      style={{
+        transform: 'translateX(${spreadX}px) rotate(${rotate}deg)',
+        color: red ? "#c0392b" : "#1f2937",
+      }}
+    >
+      <div className="sj-card-inner">
+        <div className="sj-card-face sj-card-front">
+          <div className="sj-card-corner">{card.rank}{card.suit}</div>
+          <div className="sj-card-suit">{card.suit}</div>
+          <div className="sj-card-corner sj-card-corner-bottom">{card.rank}{card.suit}</div>
+        </div>
+        <div className="sj-card-face sj-card-back" />
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   Practice Table
+========================= */
+
+export default function PracticeTable() {
+  const BET = 0.05;
+  const START_BANKROLL = 1.0;
+
+  const { publicKey } = useWallet();
+  const storageKey = publicKey ? 'soljack_practice_${publicKey.toBase58()} ': null;
+
+  const [bankroll, setBankroll] = useState<number>(START_BANKROLL);
+
+  const [deck, setDeck] = useState<Card[]>([]);
+  const [player, setPlayer] = useState<Card[]>([]);
+  const [dealer, setDealer] = useState<Card[]>([]);
+  const [phase, setPhase] = useState<Phase>("playing");
+  const [overlay, setOverlay] = useState<string>("");
+
+  const dealingRef = useRef(false);
+
+  const playerTotal = useMemo(() => handValue(player), [player]);
+  const dealerTotal = useMemo(() => handValue(dealer), [dealer]);
+
+  /* -------------------- Load bankroll per wallet -------------------- */
 
   useEffect(() => {
-    startNewHand();
+    if (!storageKey) {
+      setBankroll(START_BANKROLL);
+      return;
+    }
+    const saved = localStorage.getItem(storageKey);
+    setBankroll(saved ? Number(saved) : START_BANKROLL);
+  }, [storageKey]);
+
+  /* -------------------- Persist bankroll per wallet -------------------- */
+
+  useEffect(() => {
+    if (!storageKey) return;
+    localStorage.setItem(storageKey, bankroll.toFixed(2));
+  }, [bankroll, storageKey]);
+
+  /* -------------------- Init deck and first hand -------------------- */
+
+  useEffect(() => {
+    const fresh = buildDeck();
+    setDeck(fresh);
+    startHand(fresh);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const createDeck = () => {
-    const newDeck: number[] = [];
-    for (let i = 0; i < 52; i++) {
-      const value = (i % 13) + 1;
-      newDeck.push(value === 1 ? 11 : value > 10 ? 10 : value);
+  /* -------------------- Hand Flow -------------------- */
+
+  function startHand(currentDeck = deck) {
+    // If not enough cards to deal a hand (2+2), reshuffle
+    if (currentDeck.length < 4) {
+      reshuffle();
+      return;
     }
-    // Shuffle
-    for (let i = newDeck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [newDeck[i], newDeck[j]] = [newDeck[j], newDeck[i]];
+
+    dealingRef.current = true;
+    setPhase("playing");
+    setOverlay("");
+
+    setPlayer([]);
+    setDealer([]);
+
+    // Staggered deal with animations (dealer then player pacing)
+    setTimeout(() => deal("player"), 250);
+    setTimeout(() => deal("dealer"), 550);
+    setTimeout(() => deal("player"), 850);
+    setTimeout(() => deal("dealer"), 1150);
+
+    setTimeout(() => {
+      dealingRef.current = false;
+    }, 1250);
+  }
+
+  function reshuffle() {
+    dealingRef.current = true;
+    setPhase("reshuffle");
+    setOverlay("Reshuffling…");
+
+    setTimeout(() => {
+      const fresh = buildDeck();
+      setDeck(fresh);
+
+      setOverlay("");
+      setPhase("playing");
+      dealingRef.current = false;
+
+      startHand(fresh);
+    }, 5000);
+  }
+
+  function deal(target: "player" | "dealer") {
+    setDeck((d) => {
+      const next = [...d];
+      const card = next.shift();
+      if (!card) return d;
+
+      const dealtCard: Card = { ...card, dealtAt: Date.now() };
+
+      if (target === "player") setPlayer((h) => [...h, dealtCard]);
+      else setDealer((h) => [...h, dealtCard]);
+
+      return next;
+    });
+  }
+
+  function hit() {
+    if (phase !== "playing") return;
+    if (dealingRef.current) return;
+    dealingRef.current = true;
+
+    // If deck empties mid-hand, reshuffle BEFORE dealing (rare but possible)
+    if (deck.length < 1) {
+      reshuffle();
+      return;
     }
-    return newDeck;
-  };
 
-  const calculateHandValue = (hand: number[]) => {
-    let total = hand.reduce((sum, card) => sum + card, 0);
-    let aces = hand.filter(card => card === 11).length;
-    while (total > 21 && aces > 0) {
-      total -= 10;
-      aces--;
+    setTimeout(() => {
+      deal("player");
+      dealingRef.current = false;
+    }, 250);
+  }
+
+  function stand() {
+    if (phase !== "playing") return;
+    if (dealingRef.current) return;
+    setPhase("dealer");
+  }
+
+  /* -------------------- Bust detection -------------------- */
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+    if (playerTotal > 21) {
+      setPhase("settle");
     }
-    return total;
-  };
+  }, [playerTotal, phase]);
 
-  const dealCard = (currentDeck: number[], currentIndex: number) => {
-    if (currentIndex >= currentDeck.length) {
-      const newDeck = createDeck();
-      return { card: newDeck[0], newDeck, newIndex: 1 };
-    }
-    return { card: currentDeck[currentIndex], newDeck: currentDeck, newIndex: currentIndex + 1 };
-  };
+  /* -------------------- Dealer logic: stand on 17 -------------------- */
 
-  const startNewHand = () => {
-    const newDeck = createDeck();
-    const pCard1 = newDeck[0];
-    const dCard1 = newDeck[1];
-    const pCard2 = newDeck[2];
-    const dCard2 = newDeck[3];
+  useEffect(() => {
+    if (phase !== "dealer") return;
 
-    const newPlayerHand = [pCard1, pCard2];
-    const newDealerHand = [dCard1];
+    if (dealingRef.current) return;
 
-    setDeck(newDeck);
-    setDeckIndex(4);
-    setPlayerHand(newPlayerHand);
-    setDealerHand(newDealerHand);
-    setDealerHoleCard(dCard2);
-    setPlayerTotal(calculateHandValue(newPlayerHand));
-    setDealerTotal(dCard1);
-    setCurrentTurn('PLAYER');
-    setGameState('PLAYING');
-    setResult(null);
-  };
+    if (dealerTotal < 17) {
+      dealingRef.current = true;
 
-  const handleHit = () => {
-    if (currentTurn !== 'PLAYER' || gameState !== 'PLAYING') return;
-
-    const { card, newDeck, newIndex } = dealCard(deck, deckIndex);
-    const newHand = [...playerHand, card];
-    const newTotal = calculateHandValue(newHand);
-
-    setPlayerHand(newHand);
-    setPlayerTotal(newTotal);
-    setDeck(newDeck);
-    setDeckIndex(newIndex);
-
-    if (newTotal > 21) {
-      // Player busts - dealer wins
-      setCurrentTurn('DEALER');
-      setTimeout(() => settleBust(), 1000);
-    }
-  };
-
-  const handleStand = () => {
-    if (currentTurn !== 'PLAYER' || gameState !== 'PLAYING') return;
-
-    // Dealer's turn
-    setCurrentTurn('DEALER');
-    setTimeout(() => playDealerTurn(), 500);
-  };
-
-  const playDealerTurn = () => {
-    let currentDealerHand = [...dealerHand, dealerHoleCard!];
-    let currentTotal = calculateHandValue(currentDealerHand);
-    let currentDeck = deck;
-    let currentIndex = deckIndex;
-
-    setDealerHand(currentDealerHand);
-    setDealerTotal(currentTotal);
-    setDealerHoleCard(null);
-
-    // Dealer hits until 17
-    const hitInterval = setInterval(() => {
-      if (currentTotal < 17) {
-        const { card, newDeck, newIndex } = dealCard(currentDeck, currentIndex);
-        currentDealerHand = [...currentDealerHand, card];
-        currentTotal = calculateHandValue(currentDealerHand);
-        currentDeck = newDeck;
-        currentIndex = newIndex;
-
-        setDealerHand([...currentDealerHand]);
-        setDealerTotal(currentTotal);
-        setDeck(currentDeck);
-        setDeckIndex(currentIndex);
-      } else {
-        clearInterval(hitInterval);
-        setTimeout(() => settleHand(currentTotal), 1000);
+      if (deck.length < 1) {
+        reshuffle();
+        return;
       }
-    }, 800);
-  };
 
-  const settleBust = () => {
-    setResult('LOSS');
-    setGameState('SETTLED');
-  };
-
-  const settleHand = (finalDealerTotal: number) => {
-    if (finalDealerTotal > 21) {
-      setResult('WIN');
-    } else if (playerTotal > finalDealerTotal) {
-      setResult('WIN');
-    } else if (finalDealerTotal > playerTotal) {
-      setResult('LOSS');
+      setTimeout(() => {
+        deal("dealer");
+        dealingRef.current = false;
+      }, 450);
     } else {
-      setResult('PUSH');
+      setPhase("settle");
     }
-    setGameState('SETTLED');
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, dealerTotal]);
 
-  const handlePlayAgain = () => {
-    startNewHand();
-  };
+  /* -------------------- Settle and auto-next hand -------------------- */
 
-  if (gameState === 'SETTLED') {
+  useEffect(() => {
+    if (phase !== "settle") return;
+
+    // Determine outcome
+    let delta = -BET;
+
+    const p = playerTotal;
+    const d = dealerTotal;
+
+    if (p > 21) delta = -BET;
+    else if (d > 21) delta = BET;
+    else if (p > d) delta = BET;
+    else if (p === d) delta = 0;
+    else delta = -BET;
+
+    setBankroll((b) => Math.max(0, +(b + delta).toFixed(2)));
+
+    // Auto-next hand
+    setTimeout(() => {
+      startHand();
+    }, 1400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  /* -------------------- Reset (per wallet) -------------------- */
+
+  function resetPractice() {
+    if (!storageKey) return;
+
+    const ok = window.confirm("Reset practice bankroll back to 1.00 Folana?");
+    if (!ok) return;
+
+    localStorage.removeItem(storageKey);
+    setBankroll(START_BANKROLL);
+
+    const fresh = buildDeck();
+    setDeck(fresh);
+    setPlayer([]);
+    setDealer([]);
+    setPhase("playing");
+    setOverlay("");
+
+    setTimeout(() => startHand(fresh), 200);
+  }
+
+  /* =========================
+     Render
+========================= */
+
+  if (!publicKey) {
     return (
-      <div style={styles.container}>
-        <div style={styles.table}>
-          <div style={styles.resultsOverlay}>
-            <h2 style={{
-              ...styles.resultText,
-              background: result === 'WIN' 
-                ? 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)'
-                : result === 'LOSS'
-                ? 'linear-gradient(135deg, #f44336 0%, #e57373 100%)'
-                : 'linear-gradient(135deg, #ff9800 0%, #ffb74d 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
-              {result === 'WIN' ? 'You Won!' : result === 'LOSS' ? 'Dealer Won!' : 'Push!'}
-            </h2>
-            <div style={styles.practiceNote}>🤖 Practice Mode - No real money</div>
-            <div style={styles.finalHands}>
-              <div>
-                <div style={styles.handLabel}>Your Hand: {playerTotal}</div>
-                <div style={styles.cards}>
-                  {playerHand.map((card, i) => (
-                    <div key={i} style={styles.card}>{card}</div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={styles.handLabel}>Dealer Hand: {dealerTotal}</div>
-                <div style={styles.cards}>
-                  {dealerHand.map((card, i) => (
-                    <div key={i} style={styles.card}>{card}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div style={styles.resultActions}>
-              <button style={styles.playAgainButton} onClick={handlePlayAgain}>
-                Play Again
-              </button>
-              <button style={styles.exitButton} onClick={onExit}>
-                Exit Practice
-              </button>
-            </div>
-          </div>
-        </div>
+      <div style={styles.center}>
+        Connect Phantom to start Practice Mode
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.practiceLabel}>🤖 Practice Mode - Free Play</div>
-      
-      <div style={styles.table}>
-        {/* Dealer section */}
-        <div style={styles.dealerSection}>
-          <div style={styles.playerInfo}>
-            <span>Bot Dealer</span>
-            {currentTurn === 'DEALER' && (
-              <div style={styles.turnIndicator}>
-                <div style={styles.timerRing}>⏳</div>
-              </div>
-            )}
-          </div>
-          <div style={styles.cards}>
-            {dealerHand.map((card, i) => (
-              <div key={i} style={styles.card}>{card}</div>
-            ))}
-            {dealerHoleCard !== null && (
-              <div style={styles.card}>🂠</div>
-            )}
-          </div>
-          <div style={styles.total}>{dealerTotal}</div>
+    <div style={styles.wrap}>
+      {/* Inline CSS animations (no extra files needed) */}
+      <style>{css}</style>
+
+      {overlay && <div style={styles.overlay}>{overlay}</div>}
+
+      <div style={styles.hud}>
+        <div style={styles.hudLeft}>
+          <div style={styles.badge}>PRACTICE</div>
+          <div style={styles.sub}>Single Deck • Dealer stands on 17</div>
         </div>
 
-        {/* Player section */}
-        <div style={styles.playerSection}>
-          <div style={styles.playerInfo}>
-            <span>You (Player)</span>
-            {currentTurn === 'PLAYER' && (
-              <div style={styles.turnIndicator}>
-                <div style={styles.timerRing}>⏳</div>
-              </div>
-            )}
+        <div style={styles.hudRight}>
+          <div style={styles.bankroll}>
+            Bankroll: <b>{bankroll.toFixed(2)}</b> FOL
           </div>
-          <div style={styles.cards}>
-            {playerHand.map((card, i) => (
-              <div key={i} style={styles.card}>{card}</div>
-            ))}
-          </div>
-          <div style={styles.total}>{playerTotal}</div>
-
-          {currentTurn === 'PLAYER' && (
-            <div style={styles.actionButtons}>
-              <button style={styles.actionButton} onClick={handleStand}>
-                Stand
-              </button>
-              <button style={styles.actionButton} onClick={handleHit}>
-                Hit
-              </button>
-            </div>
+          <div style={styles.bet}>Bet: {BET.toFixed(2)} FOL</div>
+          {bankroll !== START_BANKROLL && (
+            <button style={styles.resetBtn} onClick={resetPractice}>
+              Reset
+            </button>
           )}
         </div>
       </div>
 
-      <button style={styles.exitButtonFixed} onClick={onExit}>
-        Exit Practice
-      </button>
+      <div style={styles.table}>
+        {/* Dealer */}
+        <div style={styles.section}>
+          <div style={styles.label}>DEALER</div>
+          <div style={styles.total}>Total: {dealerTotal}</div>
+          <div style={styles.hand}>
+            {dealer.map((c, i) => (
+              <PlayingCard key={c.id + c.dealtAt} card={c} index={i} fanDeg={3} />
+            ))}
+          </div>
+        </div>
+
+        {/* Center status */}
+        <div style={styles.mid}>
+          <div style={styles.status}>
+            {phase === "playing" && "YOUR TURN"}
+            {phase === "dealer" && "DEALER TURN"}
+            {phase === "settle" && "SETTLING…"}
+            {phase === "reshuffle" && "RESHUFFLING…"}
+          </div>
+          <div style={styles.deckHint}>Deck: {deck.length} cards left</div>
+        </div>
+
+        {/* Player */}
+        <div style={styles.section}>
+          <div style={styles.label}>YOU</div>
+          <div style={styles.total}>Total: {playerTotal}</div>
+          <div style={styles.hand}>
+            {player.map((c, i) => (
+              <PlayingCard key={c.id + c.dealtAt} card={c} index={i} fanDeg={-5} />
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={styles.actions}>
+          <button
+            style={{ ...styles.btn, opacity: phase === "playing" ? 1 : 0.45 }}
+            onClick={hit}
+            disabled={phase !== "playing" || dealingRef.current}
+          >
+            HIT
+          </button>
+          <button
+            style={{ ...styles.btn, opacity: phase === "playing" ? 1 : 0.45 }}
+            onClick={stand}
+            disabled={phase !== "playing" || dealingRef.current}
+          >
+            STAND
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
+/* =========================
+   Styles
+========================= */
+
+const styles: Record<string, React.CSSProperties> = {
+  wrap: {
+    minHeight: "100vh",
+    background: "radial-gradient(circle at center, #145a32 0%, #0b2e1a 65%, #071b10 100%)",
+    color: "#ecf0f1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    padding: 20,
   },
-  practiceLabel: {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
-    background: 'rgba(76, 175, 80, 0.9)',
-    color: 'white',
-    padding: '10px 20px',
-    borderRadius: '8px',
-    fontWeight: 'bold',
-    fontSize: '16px',
-    zIndex: 1000,
+  overlay: {
+    position: "absolute",
+    inset: 0,
+    background: "rgba(0,0,0,0.78)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 34,
+    fontWeight: 900,
+    letterSpacing: 1,
+    zIndex: 10,
+  },
+  center: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: 18,
+    fontWeight: 800,
+    background: "#000",
+    color: "#fff",
+  },
+  hud: {
+    position: "absolute",
+    top: 18,
+    left: 18,
+    right: 18,
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 16,
+    zIndex: 2,
+  },
+  hudLeft: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  badge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(0,0,0,0.45)",
+    border: "1px solid rgba(255,215,0,0.35)",
+    color: "#ffd700",
+    fontWeight: 900,
+    letterSpacing: 1,
+    width: "fit-content",
+  },
+  sub: {
+    opacity: 0.85,
+    fontSize: 12,
+  },
+  hudRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    background: "rgba(0,0,0,0.35)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    padding: "8px 12px",
+    borderRadius: 12,
+  },
+  bankroll: { fontWeight: 700 },
+  bet: { opacity: 0.9, fontSize: 13 },
+  resetBtn: {
+    background: "rgba(255,255,255,0.12)",
+    border: "1px solid rgba(255,255,255,0.22)",
+    color: "#fff",
+    borderRadius: 10,
+    padding: "6px 10px",
+    cursor: "pointer",
+    fontWeight: 800,
+    fontSize: 12,
   },
   table: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    background: '#1a1a1a',
-    margin: '20px',
-    borderRadius: '200px 200px 0 0',
-    padding: '40px',
-    position: 'relative',
+    width: 980,
+    maxWidth: "98vw",
+    height: 640,
+    maxHeight: "80vh",
+    background: "linear-gradient(180deg, #1e8449, #145a32)",
+    borderRadius: "340px 340px 90px 90px",
+    padding: 40,
+    boxShadow: "0 28px 90px rgba(0,0,0,0.55)",
+    position: "relative",
+    overflow: "hidden",
   },
-  dealerSection: {
-    marginBottom: '60px',
-    textAlign: 'center',
+  section: {
+    marginBottom: 34,
   },
-  playerSection: {
-    marginTop: '60px',
-    textAlign: 'center',
-  },
-  playerInfo: {
-    color: 'white',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '15px',
-  },
-  turnIndicator: {
-    position: 'relative',
-  },
-  timerRing: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    background: 'rgba(76, 175, 80, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '20px',
-  },
-  cards: {
-    display: 'flex',
-    gap: '10px',
-    justifyContent: 'center',
-    marginBottom: '15px',
-  },
-  card: {
-    width: '80px',
-    height: '120px',
-    background: 'white',
-    borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '32px',
-    fontWeight: 'bold',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+  label: {
+    textAlign: "center",
+    fontWeight: 900,
+    color: "#ffd700",
+    letterSpacing: 1,
+    marginBottom: 6,
   },
   total: {
-    color: 'white',
-    fontSize: '24px',
-    fontWeight: 'bold',
-    marginBottom: '20px',
+    textAlign: "center",
+    opacity: 0.85,
+    marginBottom: 10,
+    fontWeight: 700,
   },
-  actionButtons: {
-    display: 'flex',
-    gap: '20px',
-    justifyContent: 'center',
+  hand: {
+    display: "flex",
+    justifyContent: "center",
+    minHeight: 150,
+    position: "relative",
   },
-  actionButton: {
-    padding: '15px 40px',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    transition: 'all 0.3s ease',
+  mid: {
+    textAlign: "center",
+    margin: "10px 0 14px",
   },
-  resultsOverlay: {
-    textAlign: 'center',
-    color: 'white',
+  status: {
+    fontWeight: 900,
+    fontSize: 18,
+    color: "#00ffa3",
+    textShadow: "0 0 14px rgba(0,255,163,0.55)",
+    letterSpacing: 1,
   },
-  resultText: {
-    fontSize: '48px',
-    marginBottom: '20px',
-    fontWeight: 'bold',
+  deckHint: {
+    marginTop: 6,
+    opacity: 0.75,
+    fontSize: 12,
   },
-  practiceNote: {
-    fontSize: '16px',
-    color: '#4caf50',
-    marginBottom: '30px',
-    fontWeight: 'bold',
+  actions: {
+    position: "absolute",
+    bottom: 26,
+    left: 0,
+    right: 0,
+    display: "flex",
+    justifyContent: "center",
+    gap: 18,
+    zIndex: 2,
   },
-  finalHands: {
-    display: 'flex',
-    gap: '40px',
-    justifyContent: 'center',
-    marginBottom: '30px',
-  },
-  handLabel: {
-    fontSize: '18px',
-    marginBottom: '10px',
-  },
-  resultActions: {
-    display: 'flex',
-    gap: '15px',
-    justifyContent: 'center',
-  },
-  playAgainButton: {
-    padding: '15px 30px',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    background: 'linear-gradient(135deg, #4caf50 0%, #81c784 100%)',
-    color: 'white',
-  },
-  exitButton: {
-    padding: '15px 30px',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    background: 'rgba(255, 255, 255, 0.2)',
-    color: 'white',
-  },
-  exitButtonFixed: {
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    background: 'rgba(244, 67, 54, 0.9)',
-    color: 'white',
-    zIndex: 1000,
+  btn: {
+    padding: "12px 26px",
+    fontSize: 16,
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "rgba(0,0,0,0.35)",
+    color: "#fff",
+    cursor: "pointer",
+    fontWeight: 900,
+    letterSpacing: 1,
+    backdropFilter: "blur(8px)",
   },
 };
+
+/* =========================
+   Inline CSS (animations)
+========================= */
+
+const css = `
+.sj-card {
+  width: 92px;
+  height: 132px;
+  position: absolute;
+  transform-origin: bottom center;
+  animation: sjDeal 520ms cubic-bezier(.2,.8,.2,1) forwards;
+  opacity: 0;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.35));
+}
+
+.sj-card-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: sjFlip 520ms cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.sj-card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  backface-visibility: hidden;
+}
+
+.sj-card-front {
+  background: linear-gradient(135deg, #ffffff 0%, #f2f2f2 100%);
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.sj-card-back {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,.20), rgba(255,255,255,0) 55%),
+    linear-gradient(135deg, #0b1220, #111827);
+  border: 1px solid rgba(255,255,255,0.10);
+  transform: rotateY(180deg);
+}
+
+.sj-card-corner {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.sj-card-corner-bottom {
+  top: auto;
+  left: auto;
+  bottom: 8px;
+  right: 8px;
+  transform: rotate(180deg);
+}
+
+.sj-card-suit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 900;
+  opacity: .95;
+}
+
+@keyframes sjDeal {
+  0% {
+    opacity: 0;
+    transform: translateX(-140px) translateY(-60px) scale(.88) rotate(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(var(--sj-x, 0px)) translateY(0px) scale(1) rotate(var(--sj-r, 0deg));
+  }
+}
+
+@keyframes sjFlip {
+  0% { transform: rotateY(180deg) scale(.98); }
+  100% { transform: rotateY(0deg) scale(1); }
+}
+`;

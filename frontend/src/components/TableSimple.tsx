@@ -1,802 +1,475 @@
-import { useState, useEffect } from "react";
-import { PublicKey } from "@solana/web3.js";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useGame } from "../context/GameContext";
-import { useGameProgram } from "../lib/anchor";
-import * as crypto from "crypto-browserify";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-// Helper to convert card value to display
-function cardToString(card: number): string {
-  const suits = ["♠️", "♥️", "♦️", "♣️"];
-  const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-  const suit = suits[Math.floor(card / 13)];
-  const rank = ranks[card % 13];
-  return ${rank}${suit};
+/* =========================
+   Types
+========================= */
+
+type Suit = "♠️" | "♥️" | "♦️" | "♣️";
+type Rank =
+  | "A" | "2" | "3" | "4" | "5"
+  | "6" | "7" | "8" | "9" | "10"
+  | "J" | "Q" | "K";
+
+type Phase = "waiting" | "playing" | "dealer" | "settle";
+
+interface Card {
+  suit: Suit;
+  rank: Rank;
+  id: string;
+  dealtAt: number;
 }
 
-function isRedSuit(cardStr: string) {
-  return cardStr.includes("♥️") || cardStr.includes("♦️");
+/* =========================
+   Deck Helpers (PvP uses same visuals)
+========================= */
+
+const SUITS: Suit[] = ["♠️", "♥️", "♦️", "♣️"];
+const RANKS: Rank[] = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+
+function buildDeck(): Card[] {
+  const deck: Card[] = [];
+  for (const suit of SUITS) {
+    for (const rank of RANKS) {
+      deck.push({
+        suit,
+        rank,
+        id: ${rank}${suit}-${Math.random().toString(16).slice(2)},
+        dealtAt: 0,
+      });
+    }
+  }
+  return shuffle(deck);
 }
 
-function HandTotalPill({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={styles.totalPill}>
-      <span style={styles.totalPillLabel}>{label}</span>
-      <span style={styles.totalPillValue}>{value}</span>
-    </div>
-  );
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
-function ActiveGame({
-  tableData,
-  tablePda,
-  onLeave,
+function cardValue(rank: Rank): number {
+  if (rank === "A") return 11;
+  if (["K","Q","J"].includes(rank)) return 10;
+  return Number(rank);
+}
+
+function handValue(cards: Card[]): number {
+  let total = 0;
+  let aces = 0;
+
+  for (const c of cards) {
+    total += cardValue(c.rank);
+    if (c.rank === "A") aces++;
+  }
+
+  while (total > 21 && aces > 0) {
+    total -= 10;
+    aces--;
+  }
+
+  return total;
+}
+
+/* =========================
+   UI: Card (same as Practice)
+========================= */
+
+function PlayingCard({
+  card,
+  index,
+  fanDeg,
 }: {
-  tableData: any;
-  tablePda: PublicKey;
-  onLeave: () => void;
+  card: Card;
+  index: number;
+  fanDeg: number;
 }) {
-  const { publicKey } = useWallet();
-  const program = useGameProgram();
-  const [actionInProgress, setActionInProgress] = useState(false);
-
-  const isCreator = tableData.creator.equals(publicKey);
-  const myRole = isCreator
-    ? tableData.creatorRole
-    : tableData.creatorRole.dealer
-    ? { player: {} }
-    : { dealer: {} };
-
-  const myHand = isCreator ? tableData.creatorHand : tableData.opponentHand;
-  const myTotal = isCreator ? tableData.creatorTotal : tableData.opponentTotal;
-  const opponentHand = isCreator ? tableData.opponentHand : tableData.creatorHand;
-  const opponentTotal = isCreator ? tableData.opponentTotal : tableData.creatorTotal;
-
-  const isMyTurn =
-    tableData.currentTurn &&
-    ((tableData.currentTurn.dealer && myRole.dealer) ||
-      (tableData.currentTurn.player && myRole.player));
-
-  const betSol = Number(tableData.betAmount ?? 0) / 1e9;
-
-  const handleHit = async () => {
-    if (!publicKey  !program  actionInProgress) return;
-
-    setActionInProgress(true);
-    try {
-      const tx = await program.methods
-        .hit()
-        .accounts({
-          player: publicKey,
-          tableAccount: tablePda,
-        })
-        .rpc();
-
-      console.log("Hit transaction:", tx);
-    } catch (err: any) {
-      console.error("Failed to hit:", err);
-      alert(err.message || "Failed to hit");
-    } finally {
-      setActionInProgress(false);
-    }
-  };
-
-  const handleStand = async () => {
-    if (!publicKey  !program  actionInProgress) return;
-
-    setActionInProgress(true);
-    try {
-      const tx = await program.methods
-        .stand()
-        .accounts({
-          player: publicKey,
-          tableAccount: tablePda,
-        })
-        .rpc();
-
-      console.log("Stand transaction:", tx);
-    } catch (err: any) {
-      console.error("Failed to stand:", err);
-      alert(err.message || "Failed to stand");
-    } finally {
-      setActionInProgress(false);
-    }
-  };
-
-  const renderFanHand = (hand: number[], variant: "dealer" | "player") => {
-    const len = hand.length;
-    const mid = (len - 1) / 2;
-
-    return (
-      <div style={variant === "dealer" ? styles.dealerCardsRow : styles.playerCardsRow}>
-        {hand.map((card: number, i: number) => {
-          const str = cardToString(card);
-          const offset = i - mid;
-
-          // Fan + arc effect
-          const rotate = offset * (variant === "dealer" ? 6 : 9);
-          const translateY =
-            variant === "dealer"
-              ? Math.abs(offset) * 2
-              : Math.abs(offset) * 6;
-
-          const translateX = offset * (variant === "dealer" ? 34 : 40);
-
-          const cardStyle = {
-            ...styles.card,
-            ...(variant === "dealer" ? styles.cardDealer : styles.cardPlayer),
-            transform: translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg),
-            color: isRedSuit(str) ? "#c81e1e" : "#121212",
-          } as React.CSSProperties;
-
-          return (
-            <div key={i} style={cardStyle}>
-              <div style={styles.cardInner}>
-                <div style={styles.cardTop}>{str}</div>
-                <div style={styles.cardSuit}>{str.slice(-1)}</div>
-                <div style={styles.cardBottom}>{str}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  const red = card.suit === "♥️" || card.suit === "♦️";
+  const spreadX = index * 18;
+  const rotate = index * fanDeg;
 
   return (
-    <div style={styles.scene}>
-      <div style={styles.sceneInner}>
-        <div style={styles.topBar}>
-          <div style={styles.titleBlock}>
-            <div style={styles.gameTitle}>SolJack</div>
-            <div style={styles.subTitle}>
-              You are <b>{myRole.dealer ? "Dealer" : "Player"}</b> • Bet{" "}
-              <b>{betSol.toFixed(2)} SOL</b>
-            </div>
-          </div>
-
-          <button style={styles.leaveButton} onClick={onLeave}>
-            Leave
-          </button>
-        </div>
-
-        {/* Felt Table */}
-        <div style={styles.tableWrap}>
-          <div style={styles.tableRail} />
-          <div style={styles.tableFelt}>
-            {/* Dealer Zone */}
-            <div style={styles.dealerZone}>
-              <div style={styles.zoneHeader}>
-                <div style={styles.zoneLabel}>
-                  Dealer <span style={styles.zoneMuted}>(Opponent)</span>
-                </div>
-                <HandTotalPill label="Total" value={opponentTotal} />
-              </div>
-
-              <div style={styles.handAreaDealer}>
-                {renderFanHand(opponentHand, "dealer")}
-              </div>
-
-              {!isMyTurn && (
-                <div style={styles.turnPillTheir}>
-                  Their turn
-                </div>
-              )}
-            </div>
-
-            {/* Center Chips / Bet area */}
-            <div style={styles.centerArea}>
-              <div style={styles.betChipRow}>
-                <div style={styles.chip} />
-                <div style={styles.chip} />
-                <div style={styles.chip} />
-              </div>
-              <div style={styles.betText}>
-                Pot: <b>{(betSol * 2).toFixed(2)} SOL</b>
-              </div>
-              <div style={styles.smallNote}>Provably fair shuffle • Commit/Reveal</div>
-            </div>
-
-            {/* Player Zone (Arc) */}
-            <div style={styles.playerZone}>
-              <div style={styles.zoneHeader}>
-                <div style={styles.zoneLabel}>
-                  You <span style={styles.zoneMuted}>({myRole.dealer ? "Dealer" : "Player"})</span>
-                </div>
-                <HandTotalPill label="Total" value={myTotal} />
-              </div>
-
-              <div style={styles.handAreaPlayer}>
-                {renderFanHand(myHand, "player")}
-              </div>
-
-              {isMyTurn ? (
-                <div style={styles.actions}>
-                  <button
-                    style={{
-                      ...styles.actionBtn,
-                      ...styles.hitButton,
-                      opacity: actionInProgress ? 0.7 : 1,
-                    }}
-                    onClick={handleHit}
-                    disabled={actionInProgress}
-                  >
-                    {actionInProgress ? "…" : "HIT"}
-                  </button>
-
-                  <button
-                    style={{
-                      ...styles.actionBtn,
-                      ...styles.standButton,
-                      opacity: actionInProgress ? 0.7 : 1,
-                    }}
-                    onClick={handleStand}
-                    disabled={actionInProgress}
-                  >
-                    {actionInProgress ? "…" : "STAND"}
-                  </button>
-                </div>
-              ) : (
-                <div style={styles.waitingMessage}>Waiting for opponent…</div>
-              )}
-            </div>
+    <div
+      className="sj-card"
+      style={{
+        transform: translateX(${spreadX}px) rotate(${rotate}deg),
+        color: red ? "#c0392b" : "#1f2937",
+      }}
+    >
+      <div className="sj-card-inner">
+        <div className="sj-card-face sj-card-front">
+          <div className="sj-card-corner">{card.rank}{card.suit}</div>
+          <div className="sj-card-suit">{card.suit}</div>
+          <div className="sj-card-corner sj-card-corner-bottom">
+            {card.rank}{card.suit}
           </div>
         </div>
-
-        <div style={styles.footerHint}>
-          Tip: You can refresh without losing your seat — table state is on-chain.
-        </div>
+        <div className="sj-card-face sj-card-back" />
       </div>
     </div>
   );
 }
+
+/* =========================
+   PvP Table
+========================= */
 
 export default function TableSimple() {
-  const { currentTableId, setCurrentTableId } = useGame();
-  const { publicKey } = useWallet();
-  const program = useGameProgram();
+  const [deck, setDeck] = useState<Card[]>([]);
+  const [player, setPlayer] = useState<Card[]>([]);
+  const [dealer, setDealer] = useState<Card[]>([]);
+  const [phase, setPhase] = useState<Phase>("waiting");
 
-  const [tableData, setTableData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const dealingRef = useRef(false);
 
-  // Poll table state
+  const playerTotal = useMemo(() => handValue(player), [player]);
+  const dealerTotal = useMemo(() => handValue(dealer), [dealer]);
+
+  /* -------------------- Init (mock PvP join) -------------------- */
+
   useEffect(() => {
-    if (!currentTableId || !program) return;
-
-    const fetchTable = async () => {
-      try {
-        const tablePda = new PublicKey(currentTableId);
-        const data = await program.account.tableAccount.fetch(tablePda);
-        setTableData(data);
-        setLoading(false);
-
-        // Auto-handle commit/reveal phases
-        await autoHandlePhases(data, tablePda);
-      } catch (err) {
-        console.error("Error fetching table:", err);
-        setError("Failed to load table");
-        setLoading(false);
-      }
-    };
-
-    fetchTable();
-    const interval = setInterval(fetchTable, 2000);
-    return () => clearInterval(interval);
+    const fresh = buildDeck();
+    setDeck(fresh);
+    setPhase("playing");
+    startHand(fresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTableId, program, publicKey]);
+  }, []);
 
-  const autoHandlePhases = async (data: any, tablePda: PublicKey) => {
-    if (!publicKey || !program) return;
+  /* -------------------- Hand Flow -------------------- */
 
-    const isCreator = data.creator.equals(publicKey);
-    const isOpponent = data.opponent?.equals(publicKey);
+  function startHand(currentDeck = deck) {
+    dealingRef.current = true;
+    setPlayer([]);
+    setDealer([]);
 
-    if (!isCreator && !isOpponent) return;
+    setTimeout(() => deal("player"), 250);
+    setTimeout(() => deal("dealer"), 550);
+    setTimeout(() => deal("player"), 850);
+    setTimeout(() => deal("dealer"), 1150);
 
-    // Phase: Committing - submit our commitment
-    if (data.state.committing) {
-      const needsCommitment =
-        (isCreator && !data.creatorCommitment) ||
-        (isOpponent && !data.opponentCommitment);
+    setTimeout(() => {
+      dealingRef.current = false;
+      setPhase("playing");
+    }, 1300);
+  }
 
-      if (needsCommitment) {
-        try {
-          const seed = crypto.randomBytes(32);
-          const hash = crypto.createHash("sha256");
-          hash.update(seed);
-          const commitment = hash.digest();
+  function deal(target: "player" | "dealer") {
+    setDeck((d) => {
+      const next = [...d];
+      const card = next.shift();
+      if (!card) return d;
 
-          localStorage.setItem(`table_${currentTableId}_seed`, seed.toString("hex"));
+      const dealt: Card = { ...card, dealtAt: Date.now() };
 
-          await program.methods
-            .submitCommitment(Array.from(commitment))
-            .accounts({
-              player: publicKey,
-              tableAccount: tablePda,
-            })
-            .rpc();
+      if (target === "player") setPlayer((h) => [...h, dealt]);
+      else setDealer((h) => [...h, dealt]);
 
-          console.log("Commitment submitted");
-        } catch (err) {
-          console.error("Failed to submit commitment:", err);
-        }
-      }
+      return next;
+    });
+  }
+
+  function hit() {
+    if (phase !== "playing" || dealingRef.current) return;
+    dealingRef.current = true;
+
+    setTimeout(() => {
+      deal("player");
+      dealingRef.current = false;
+    }, 250);
+  }
+
+  function stand() {
+    if (phase !== "playing") return;
+    setPhase("dealer");
+  }
+
+  /* -------------------- Dealer Logic -------------------- */
+
+  useEffect(() => {
+    if (phase !== "dealer") return;
+
+    if (dealerTotal < 17) {
+      dealingRef.current = true;
+      setTimeout(() => {
+        deal("dealer");
+        dealingRef.current = false;
+      }, 450);
+    } else {
+      setPhase("settle");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, dealerTotal]);
 
-    // Phase: Both committed, need to reveal
-    if (data.creatorCommitment && data.opponentCommitment) {
-      const needsReveal =
-        (isCreator && !data.creatorSeedRevealed) ||
-        (isOpponent && !data.opponentSeedRevealed);
+  /* -------------------- Settle (mock PvP) -------------------- */
 
-      if (needsReveal) {
-        try {
-          const seedHex = localStorage.getItem(`table_${currentTableId}_seed`);
-          if (!seedHex) {
-            console.error("Seed not found in localStorage");
-            return;
-          }
+  useEffect(() => {
+    if (phase !== "settle") return;
 
-          const seed = Buffer.from(seedHex, "hex");
+    // Pause briefly, then next hand
+    setTimeout(() => {
+      startHand();
+    }, 1400);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
-          await program.methods
-            .revealSeed(Array.from(seed))
-            .accounts({
-              player: publicKey,
-              tableAccount: tablePda,
-            })
-            .rpc();
-
-          console.log("Seed revealed");
-        } catch (err) {
-          console.error("Failed to reveal seed:", err);
-        }
-      }
-    }
-  };
-
-  if (loading) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.loading}>Loading table…</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.error}>{error}</div>
-        <button style={styles.simpleBtn} onClick={() => setCurrentTableId(null)}>
-          Back to Lobby
-        </button>
-      </div>
-    );
-  }
-
-  if (!tableData) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.error}>Table not found</div>
-        <button style={styles.simpleBtn} onClick={() => setCurrentTableId(null)}>
-          Back to Lobby
-        </button>
-      </div>
-    );
-  }
-
-  const isWaiting = !tableData.opponent;
-  const isCommitting = tableData.state.committing;
-  const isActive = tableData.state.active;
-  const isSettled = tableData.state.settled;
-
-  const betSol = Number(tableData.betAmount ?? 0) / 1e9;
-
-  if (isWaiting) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.cardPanel}>
-          <h2 style={styles.panelTitle}>Waiting for opponent…</h2>
-          <div style={styles.panelRow}>Table: <b>{currentTableId?.slice(0, 10)}…</b></div>
-          <div style={styles.panelRow}>Bet: <b>{betSol.toFixed(2)} SOL</b></div>
-          <button style={styles.simpleBtn} onClick={() => setCurrentTableId(null)}>
-            Leave Table
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isCommitting) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.cardPanel}>
-          <h2 style={styles.panelTitle}>Shuffling deck…</h2>
-          <div style={styles.smallNote}>Provably fair commit-reveal protocol</div>
-          <div style={styles.panelRow}>Creator committed: {tableData.creatorCommitment ? "✓" : "…"}</div>
-          <div style={styles.panelRow}>Opponent committed: {tableData.opponentCommitment ? "✓" : "…"}</div>
-          <div style={styles.panelRow}>Creator revealed: {tableData.creatorSeedRevealed ? "✓" : "…"}</div>
-          <div style={styles.panelRow}>Opponent revealed: {tableData.opponentSeedRevealed ? "✓" : "…"}</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isActive) {
-    return (
-      <ActiveGame
-        tableData={tableData}
-        tablePda={new PublicKey(currentTableId!)}
-        onLeave={() => setCurrentTableId(null)}
-      />
-    );
-  }
-
-  if (isSettled) {
-    return (
-      <div style={styles.centerScreen}>
-        <div style={styles.cardPanel}>
-          <h2 style={styles.panelTitle}>Game Complete!</h2>
-          <div style={styles.smallNote}>Final results will be displayed here.</div>
-          <button style={styles.simpleBtn} onClick={() => setCurrentTableId(null)}>
-            Back to Lobby
-          </button>
-        </div>
-      </div>
-    );
-  }
+  /* =========================
+     Render
+========================= */
 
   return (
-    <div style={styles.centerScreen}>
-      <div style={styles.cardPanel}>
-        <h2 style={styles.panelTitle}>Unknown State</h2>
-        <pre style={styles.pre}>{JSON.stringify(tableData, null, 2)}</pre>
-        <button style={styles.simpleBtn} onClick={() => setCurrentTableId(null)}>
-          Back to Lobby
-        </button>
+    <div style={styles.wrap}>
+      <style>{css}</style>
+
+      <div style={styles.hud}>
+        <div style={styles.badge}>PVP</div>
+        <div style={styles.sub}>Waiting on-chain sync (mock)</div>
+      </div>
+
+      <div style={styles.table}>
+        {/* Dealer */}
+        <div style={styles.section}>
+          <div style={styles.label}>DEALER</div>
+          <div style={styles.total}>Total: {dealerTotal}</div>
+          <div style={styles.hand}>
+            {dealer.map((c, i) => (
+              <PlayingCard
+                key={c.id + c.dealtAt}
+                card={c}
+                index={i}
+                fanDeg={3}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Center */}
+        <div style={styles.mid}>
+          <div style={styles.status}>
+            {phase === "playing" && "YOUR TURN"}
+            {phase === "dealer" && "DEALER TURN"}
+            {phase === "settle" && "SETTLING…"}
+          </div>
+        </div>
+
+        {/* Player */}
+        <div style={styles.section}>
+          <div style={styles.label}>YOU</div>
+          <div style={styles.total}>Total: {playerTotal}</div>
+          <div style={styles.hand}>
+            {player.map((c, i) => (
+              <PlayingCard
+                key={c.id + c.dealtAt}
+                card={c}
+                index={i}
+                fanDeg={-5}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={styles.actions}>
+          <button
+            style={{ ...styles.btn, opacity: phase === "playing" ? 1 : 0.45 }}
+            onClick={hit}
+            disabled={phase !== "playing"}
+          >
+            HIT
+          </button>
+          <button
+            style={{ ...styles.btn, opacity: phase === "playing" ? 1 : 0.45 }}
+            onClick={stand}
+            disabled={phase !== "playing"}
+          >
+            STAND
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
-  // Scene / background
-  scene: {
+/* =========================
+   Styles (same look as Practice)
+========================= */
+
+const styles: Record<string, React.CSSProperties> = {
+  wrap: {
     minHeight: "100vh",
     background:
-      "radial-gradient(circle at 20% 0%, rgba(120, 0, 255, 0.18), transparent 40%), radial-gradient(circle at 80% 10%, rgba(0, 200, 255, 0.15), transparent 45%), linear-gradient(180deg, #070b12 0%, #05060a 100%)",
-    color: "#fff",
-    padding: "24px 16px 40px",
-  },
-  sceneInner: {
-    maxWidth: "980px",
-    margin: "0 auto",
-  },
-  topBar: {
+      "radial-gradient(circle at center, #145a32 0%, #0b2e1a 65%, #071b10 100%)",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "16px",
-    gap: "12px",
+    justifyContent: "center",
+    position: "relative",
+    color: "#ecf0f1",
   },
-  titleBlock: {
+  hud: {
+    position: "absolute",
+    top: 18,
+    left: 18,
     display: "flex",
     flexDirection: "column",
-    gap: "4px",
+    gap: 6,
+    zIndex: 2,
   },
-  gameTitle: {
-    fontSize: "28px",
-    fontWeight: 800,
-    letterSpacing: "0.5px",
+  badge: {
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(0,0,0,0.45)",
+    border: "1px solid rgba(255,215,0,0.35)",
+    color: "#ffd700",
+    fontWeight: 900,
+    letterSpacing: 1,
+    width: "fit-content",
   },
-  subTitle: {
-    fontSize: "13px",
+  sub: {
+    fontSize: 12,
     opacity: 0.85,
   },
-
-  // Table
-  tableWrap: {
+  table: {
+    width: 980,
+    height: 640,
+    background: "linear-gradient(180deg, #1e8449, #145a32)",
+    borderRadius: "340px 340px 90px 90px",
+    padding: 40,
+    boxShadow: "0 28px 90px rgba(0,0,0,0.55)",
     position: "relative",
-    borderRadius: "28px",
-    overflow: "hidden",
-    boxShadow: "0 30px 80px rgba(0,0,0,0.55)",
   },
-  tableRail: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 35%, rgba(0,0,0,0.55) 100%)",
-    pointerEvents: "none",
-  },
-  tableFelt: {
-    position: "relative",
-    padding: "26px 18px 22px",
-    background:
-      "radial-gradient(circle at 50% 15%, rgba(60, 220, 120, 0.35) 0%, rgba(25, 140, 75, 0.32) 28%, rgba(11, 70, 36, 0.98) 72%), linear-gradient(180deg, #0f5b2b 0%, #083519 100%)",
-    borderRadius: "28px",
-    border: "1px solid rgba(255,255,255,0.10)",
-    boxShadow: "inset 0 0 120px rgba(0,0,0,0.45)",
-    minHeight: "620px",
-  },
-
-  dealerZone: {
-    padding: "10px 10px 0",
-  },
-  playerZone: {
-    marginTop: "18px",
-    padding: "18px 14px 16px",
-    borderTopLeftRadius: "320px",
-    borderTopRightRadius: "320px",
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.10)",
-    boxShadow: "inset 0 0 35px rgba(0,0,0,0.25)",
-  },
-  zoneHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginBottom: "12px",
-  },
-  zoneLabel: {
-    fontSize: "14px",
-    fontWeight: 700,
-    letterSpacing: "0.2px",
-  },
-  zoneMuted: {
-    opacity: 0.75,
-    fontWeight: 600,
-  },
-
-  // Center area
-  centerArea: {
-    marginTop: "10px",
-    marginBottom: "8px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "6px",
-    opacity: 0.95,
-  },
-  betChipRow: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-  },
-  chip: {
-    width: "28px",
-    height: "28px",
-    borderRadius: "999px",
-    background:
-      "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0.1) 35%), linear-gradient(135deg, rgba(0, 220, 255, 0.55), rgba(160, 80, 255, 0.45))",
-    border: "1px solid rgba(255,255,255,0.25)",
-    boxShadow: "0 8px 18px rgba(0,0,0,0.35)",
-  },
-  betText: {
-    fontSize: "14px",
-  },
-  smallNote: {
-    fontSize: "12px",
-    opacity: 0.75,
+  section: { marginBottom: 34 },
+  label: {
     textAlign: "center",
-  },
-
-  // Turn pills
-  turnPillTheir: {
-    marginTop: "10px",
-    display: "inline-block",
-    padding: "6px 10px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    fontSize: "12px",
-    opacity: 0.9,
-  },
-
-  // Cards
-  handAreaDealer: {
-    position: "relative",
-    height: "120px",
-  },
-  handAreaPlayer: {
-    position: "relative",
-    height: "170px",
-  },
-  dealerCardsRow: {
-    position: "absolute",
-    left: "50%",
-    top: "18px",
-    transform: "translateX(-50%)",
-    height: "120px",
-  },
-  playerCardsRow: {
-    position: "absolute",
-    left: "50%",
-    top: "10px",
-    transform: "translateX(-50%)",
-    height: "170px",
-  },
-  card: {
-    position: "absolute",
-    width: "78px",
-    height: "112px",
-    borderRadius: "14px",
-    background: "linear-gradient(180deg, #ffffff 0%, #f2f2f2 100%)",
-    border: "1px solid rgba(0,0,0,0.25)",
-    boxShadow: "0 18px 35px rgba(0,0,0,0.35)",
-    userSelect: "none",
-  },
-  cardDealer: {
-    width: "70px",
-    height: "102px",
-    opacity: 0.95,
-  },
-  cardPlayer: {
-    width: "84px",
-    height: "122px",
-    opacity: 1,
-  },
-  cardInner: {
-    width: "100%",
-    height: "100%",
-    borderRadius: "14px",
-    padding: "10px",
-    position: "relative",
-    boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.45)",
-  },
-  cardTop: {
-    fontSize: "16px",
-    fontWeight: 800,
-  },
-  cardSuit: {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    transform: "translate(-50%, -50%)",
-    fontSize: "34px",
-    opacity: 0.25,
     fontWeight: 900,
+    color: "#ffd700",
+    letterSpacing: 1,
+    marginBottom: 6,
   },
-  cardBottom: {
-    position: "absolute",
-    right: "10px",
-    bottom: "8px",
-    fontSize: "16px",
-    fontWeight: 800,
-    transform: "rotate(180deg)",
+  total: {
+    textAlign: "center",
+    opacity: 0.85,
+    marginBottom: 10,
+    fontWeight: 700,
   },
-
-  // Total pill
-  totalPill: {
+  hand: {
     display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "6px 10px",
-    borderRadius: "999px",
-    background: "rgba(0,0,0,0.18)",
-    border: "1px solid rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    minHeight: 150,
+    position: "relative",
   },
-  totalPillLabel: {
-    fontSize: "12px",
-    opacity: 0.8,
+  mid: {
+    textAlign: "center",
+    margin: "10px 0 14px",
   },
-  totalPillValue: {
-    fontSize: "13px",
-    fontWeight: 800,
+  status: {
+    fontWeight: 900,
+    fontSize: 18,
+    color: "#00ffa3",
+    textShadow: "0 0 14px rgba(0,255,163,0.55)",
+    letterSpacing: 1,
   },
-
-  // Actions
   actions: {
-    marginTop: "6px",
+    position: "absolute",
+    bottom: 26,
+    left: 0,
+    right: 0,
     display: "flex",
     justifyContent: "center",
-    gap: "12px",
+    gap: 18,
   },
-  actionBtn: {
-    border: "none",
-    borderRadius: "16px",
-    padding: "14px 26px",
-    fontSize: "15px",
+  btn: {
+    padding: "12px 26px",
+    fontSize: 16,
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.18)",
+    background: "rgba(0,0,0,0.35)",
+    color: "#fff",
+    cursor: "pointer",
     fontWeight: 900,
-    letterSpacing: "0.6px",
-    cursor: "pointer",
-    boxShadow: "0 14px 30px rgba(0,0,0,0.35)",
-    color: "#0b0f14",
-    minWidth: "120px",
-  },
-  hitButton: {
-    background:
-      "linear-gradient(135deg, rgba(60, 255, 170, 0.92) 0%, rgba(0, 210, 140, 0.92) 60%, rgba(0, 170, 120, 0.92) 100%)",
-  },
-  standButton: {
-    background:
-      "linear-gradient(135deg, rgba(255, 120, 120, 0.95) 0%, rgba(255, 80, 120, 0.95) 55%, rgba(210, 40, 100, 0.95) 100%)",
-    color: "#14070b",
-  },
-  waitingMessage: {
-    marginTop: "10px",
-    textAlign: "center",
-    fontSize: "13px",
-    opacity: 0.8,
-  },
-
-  // Buttons / misc
-  leaveButton: {
-    background: "rgba(255,255,255,0.08)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    borderRadius: "12px",
-    padding: "10px 14px",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 700,
-  },
-  footerHint: {
-    marginTop: "12px",
-    fontSize: "12px",
-    opacity: 0.6,
-    textAlign: "center",
-  },
-
-  // Simple states (waiting/committing/etc)
-  centerScreen: {
-    minHeight: "100vh",
-    background:
-      "radial-gradient(circle at 20% 0%, rgba(120, 0, 255, 0.18), transparent 40%), radial-gradient(circle at 80% 10%, rgba(0, 200, 255, 0.15), transparent 45%), linear-gradient(180deg, #070b12 0%, #05060a 100%)",
-    color: "#fff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-  },
-  cardPanel: {
-    width: "100%",
-    maxWidth: "520px",
-    borderRadius: "18px",
-    padding: "18px 16px",
-    background: "rgba(255,255,255,0.06)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
-  },
-  panelTitle: {
-    margin: "0 0 10px 0",
-    fontSize: "20px",
-    fontWeight: 900,
-  },
-  panelRow: {
-    fontSize: "14px",
-    opacity: 0.9,
-    marginTop: "6px",
-  },
-  loading: {
-    fontSize: "18px",
-    fontWeight: 800,
-    opacity: 0.9,
-  },
-  error: {
-    color: "#ff7a7a",
-    fontSize: "14px",
-    marginBottom: "12px",
-    fontWeight: 700,
-  },
-  simpleBtn: {
-    marginTop: "14px",
-    width: "100%",
-    background: "rgba(255,255,255,0.10)",
-    border: "1px solid rgba(255,255,255,0.14)",
-    borderRadius: "12px",
-    padding: "12px 14px",
-    color: "#fff",
-    cursor: "pointer",
-    fontWeight: 800,
-  },
-  pre: {
-    marginTop: "10px",
-    maxHeight: "240px",
-    overflow: "auto",
-    fontSize: "12px",
-    background: "rgba(0,0,0,0.25)",
-    padding: "10px",
-    borderRadius: "12px",
+    letterSpacing: 1,
   },
 };
+
+/* =========================
+   Inline CSS animations
+========================= */
+
+const css = `
+.sj-card {
+  width: 92px;
+  height: 132px;
+  position: absolute;
+  transform-origin: bottom center;
+  animation: sjDeal 520ms cubic-bezier(.2,.8,.2,1) forwards;
+  opacity: 0;
+  filter: drop-shadow(0 10px 26px rgba(0,0,0,.35));
+}
+
+.sj-card-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: sjFlip 520ms cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.sj-card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  backface-visibility: hidden;
+}
+
+.sj-card-front {
+  background: linear-gradient(135deg, #ffffff 0%, #f2f2f2 100%);
+}
+
+.sj-card-back {
+  background: linear-gradient(135deg, #0b1220, #111827);
+  transform: rotateY(180deg);
+}
+
+.sj-card-corner {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.sj-card-corner-bottom {
+  top: auto;
+  left: auto;
+  bottom: 8px;
+  right: 8px;
+  transform: rotate(180deg);
+}
+
+.sj-card-suit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 900;
+}
+
+@keyframes sjDeal {
+  from {
+    opacity: 0;
+    transform: translateX(-140px) translateY(-60px) scale(.88) rotate(-10deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0px) translateY(0px) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes sjFlip {
+  from { transform: rotateY(180deg); }
+  to { transform: rotateY(0deg); }
+}
+`;

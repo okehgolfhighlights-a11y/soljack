@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
-import { useGame } from '../context/GameContext';
+import { useEffect, useState } from "react";
+import { useGame } from "../context/GameContext";
+
+interface CreatorStats {
+  wins: number;
+  losses: number;
+  totalHands: number;
+}
 
 interface OpenTable {
   tableId: string;
   betAmount: number;
   creator: string;
   creatorUsername: string | null;
-  creatorRole: 'DEALER' | 'PLAYER';
-  openRole: 'DEALER' | 'PLAYER';
-  creatorStats: {
-    wins: number;
-    losses: number;
-    totalHands: number;
-  };
+  creatorRole: "DEALER" | "PLAYER";
+  openRole: "DEALER" | "PLAYER";
+  creatorStats: CreatorStats;
   timeRemaining: number;
   createdAt: number;
 }
@@ -25,63 +27,57 @@ export default function Lobby({ betTier }: Props) {
   const [openTables, setOpenTables] = useState<OpenTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateTable, setShowCreateTable] = useState(false);
+
   const { setCurrentTableId } = useGame();
 
   useEffect(() => {
+    let alive = true;
+
+    const fetchTables = async () => {
+      try {
+        const res = await fetch(
+          '${import.meta.env.VITE_BACKEND_URL}/tables/open?betAmount=${betTier * 1e9}'
+        );
+        const data = await res.json();
+        if (alive) setOpenTables(data.tables || []);
+      } catch (err) {
+        console.error("Failed to fetch tables", err);
+        if (alive) setOpenTables([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
     fetchTables();
-    const interval = setInterval(fetchTables, 5000); // Refresh every 5s
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchTables, 5000);
+
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
   }, [betTier]);
 
-  const fetchTables = async () => {
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_URL}/tables/open?betAmount=${betTier * 1e9}`
-      );
-      const data = await response.json();
-      setOpenTables(data.tables || []);
-    } catch (error) {
-      console.error('Failed to fetch tables:', error);
-      setOpenTables([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateTable = () => {
-    setShowCreateTable(true);
-  };
-
-  const handleJoinTable = async (tableId: string) => {
-    // TODO: Call join_table instruction
+  const handleJoinTable = (tableId: string) => {
     setCurrentTableId(tableId);
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h2 style={styles.title}>Tables - {betTier} SOL</h2>
-        <button style={styles.createButton} onClick={handleCreateTable}>
+        <h2 style={styles.title}>{betTier} SOL Tables</h2>
+        <button style={styles.createButton} onClick={() => setShowCreateTable(true)}>
           Create Table
         </button>
       </div>
 
-      {showCreateTable && (
-        <CreateTableModal
-          betTier={betTier}
-          onClose={() => setShowCreateTable(false)}
-          onCreated={(tableId) => setCurrentTableId(tableId)}
-        />
-      )}
-
       {loading ? (
-        <div style={styles.loading}>Loading tables...</div>
+        <div style={styles.loading}>Loading tables…</div>
       ) : (
         <div style={styles.tableGrid}>
           {openTables.length === 0 ? (
             <div style={styles.emptyState}>
-              <p>No open tables at this bet tier.</p>
-              <p>Be the first to create one!</p>
+              <p>No open tables at this tier.</p>
+              <p>Be the first to create one.</p>
             </div>
           ) : (
             openTables.map((table) => (
@@ -94,50 +90,68 @@ export default function Lobby({ betTier }: Props) {
           )}
         </div>
       )}
+
+      {showCreateTable && (
+        <CreateTableModal
+          betTier={betTier}
+          onClose={() => setShowCreateTable(false)}
+          onCreated={(id) => setCurrentTableId(id)}
+        />
+      )}
     </div>
   );
 }
 
-function TableCard({ table, onJoin }: { table: OpenTable; onJoin: (id: string) => void }) {
+/* =======================
+   TABLE CARD
+======================= */
+
+function TableCard({
+  table,
+  onJoin,
+}: {
+  table: OpenTable;
+  onJoin: (id: string) => void;
+}) {
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return '${m}:${s.toString().padStart(2, "0")}';
   };
 
   return (
     <div style={styles.tableCard} onClick={() => onJoin(table.tableId)}>
       <div style={styles.cardHeader}>
         <span style={table.creatorUsername ? styles.usernameGold : styles.usernameDefault}>
-          {table.creatorUsername || `${table.creator.slice(0, 4)}...${table.creator.slice(-4)}`}
+          {table.creatorUsername ??
+            `${table.creator.slice(0, 4)}…${table.creator.slice(-4)}`}
         </span>
         <span style={styles.timer}>{formatTime(table.timeRemaining)}</span>
       </div>
 
       <div style={styles.seatsContainer}>
-        <div style={table.creatorRole === 'DEALER' ? styles.seatTaken : styles.seatOpen}>
-          <div style={styles.seatLabel}>DEALER</div>
-          {table.creatorRole === 'DEALER' && (
-            <div style={styles.playerInfo}>
-              {table.creatorUsername || `${table.creator.slice(0, 4)}...`}
-            </div>
-          )}
-        </div>
-
-        <div style={styles.divider} />
-
-        <div style={table.creatorRole === 'PLAYER' ? styles.seatTaken : styles.seatOpen}>
-          <div style={styles.seatLabel}>PLAYER</div>
-          {table.creatorRole === 'PLAYER' && (
-            <div style={styles.playerInfo}>
-              {table.creatorUsername || `${table.creator.slice(0, 4)}...`}
-            </div>
-          )}
-        </div>
+        <Seat
+          label="DEALER"
+          taken={table.creatorRole === "DEALER"}
+          name={
+            table.creatorRole === "DEALER"
+              ? table.creatorUsername ?? table.creator.slice(0, 4)
+              : null
+          }
+        />
+        <Seat
+          label="PLAYER"
+          taken={table.creatorRole === "PLAYER"}
+          name={
+            table.creatorRole === "PLAYER"
+              ? table.creatorUsername ?? table.creator.slice(0, 4)
+              : null
+          }
+        />
       </div>
 
       <div style={styles.stats}>
-        {table.creatorStats.wins}W - {table.creatorStats.losses}L
+        {table.creatorStats.wins}W / {table.creatorStats.losses}L
         <span style={styles.handsPlayed}>
           ({table.creatorStats.totalHands} hands)
         </span>
@@ -146,6 +160,27 @@ function TableCard({ table, onJoin }: { table: OpenTable; onJoin: (id: string) =
   );
 }
 
+function Seat({
+  label,
+  taken,
+  name,
+}: {
+  label: string;
+  taken: boolean;
+  name: string | null;
+}) {
+  return (
+    <div style={taken ? styles.seatTaken : styles.seatOpen}>
+      <div style={styles.seatLabel}>{label}</div>
+      {name && <div style={styles.playerInfo}>{name}</div>}
+    </div>
+  );
+}
+
+/* =======================
+   CREATE TABLE MODAL
+======================= */
+
 function CreateTableModal({
   betTier,
   onClose,
@@ -153,22 +188,22 @@ function CreateTableModal({
 }: {
   betTier: number;
   onClose: () => void;
-  onCreated: (tableId: string) => void;
+  onCreated: (id: string) => void;
 }) {
-  const [selectedRole, setSelectedRole] = useState<'DEALER' | 'PLAYER' | null>(null);
+  const [role, setRole] = useState<"DEALER" | "PLAYER" | null>(null);
   const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
-    if (!selectedRole) return;
-    
+    if (!role) return;
     setCreating(true);
+
     try {
-      // TODO: Call create_table instruction
-      const mockTableId = 'table_' + Date.now();
-      onCreated(mockTableId);
+      // TEMP mock until backend instruction wired
+      const mockId = 'table_${Date.now()}';
+      onCreated(mockId);
       onClose();
-    } catch (error) {
-      console.error('Failed to create table:', error);
+    } catch (err) {
+      console.error("Create table failed", err);
     } finally {
       setCreating(false);
     }
@@ -177,42 +212,39 @@ function CreateTableModal({
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={styles.modalTitle}>Create Table - {betTier} SOL</h3>
-        <p style={styles.modalSubtitle}>Choose your role:</p>
+        <h3 style={styles.modalTitle}>Create {betTier} SOL Table</h3>
 
         <div style={styles.roleSelector}>
           <button
             style={{
               ...styles.roleButton,
-              background: selectedRole === 'DEALER' ? '#90caf9' : 'rgba(255, 255, 255, 0.5)',
+              background: role === "DEALER" ? "#90caf9" : "rgba(255,255,255,0.5)",
             }}
-            onClick={() => setSelectedRole('DEALER')}
-            disabled={creating}
+            onClick={() => setRole("DEALER")}
           >
-            DEALER
+            Dealer
           </button>
           <button
             style={{
               ...styles.roleButton,
-              background: selectedRole === 'PLAYER' ? '#90caf9' : 'rgba(255, 255, 255, 0.5)',
+              background: role === "PLAYER" ? "#90caf9" : "rgba(255,255,255,0.5)",
             }}
-            onClick={() => setSelectedRole('PLAYER')}
-            disabled={creating}
+            onClick={() => setRole("PLAYER")}
           >
-            PLAYER
+            Player
           </button>
         </div>
 
         <div style={styles.modalActions}>
-          <button style={styles.cancelButton} onClick={onClose} disabled={creating}>
-            Back
+          <button style={styles.cancelButton} onClick={onClose}>
+            Cancel
           </button>
           <button
             style={styles.confirmButton}
+            disabled={!role || creating}
             onClick={handleCreate}
-            disabled={!selectedRole || creating}
           >
-            {creating ? 'Creating...' : 'Create Table'}
+            {creating ? "Creating…" : "Create"}
           </button>
         </div>
       </div>
@@ -220,196 +252,114 @@ function CreateTableModal({
   );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '20px',
-  },
+/* =======================
+   STYLES
+======================= */
+
+const styles: { [k: string]: React.CSSProperties } = {
+  container: { maxWidth: 1200, margin: "0 auto", padding: 20 },
   header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '30px',
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 30,
   },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    color: '#333',
-  },
+  title: { fontSize: 28, fontWeight: "bold" },
   createButton: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '12px 24px',
-    fontSize: '16px',
-    fontWeight: 600,
-    color: 'white',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
+    background: "linear-gradient(135deg,#667eea,#764ba2)",
+    color: "white",
+    border: "none",
+    borderRadius: 8,
+    padding: "12px 24px",
+    cursor: "pointer",
   },
-  loading: {
-    textAlign: 'center',
-    padding: '60px',
-    fontSize: '18px',
-    color: '#666',
-  },
+  loading: { textAlign: "center", padding: 60, fontSize: 18 },
   tableGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-    gap: '20px',
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
+    gap: 20,
   },
-  emptyState: {
-    gridColumn: '1 / -1',
-    textAlign: 'center',
-    padding: '60px 20px',
-    fontSize: '18px',
-    color: '#666',
-  },
+  emptyState: { textAlign: "center", color: "#666" },
   tableCard: {
-    background: 'rgba(255, 255, 255, 0.6)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: '12px',
-    padding: '20px',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    border: '2px solid transparent',
+    background: "rgba(255,255,255,0.65)",
+    backdropFilter: "blur(10px)",
+    borderRadius: 12,
+    padding: 20,
+    cursor: "pointer",
+    transition: "all .3s ease",
   },
-  cardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: '15px',
-  },
+  cardHeader: { display: "flex", justifyContent: "space-between" },
   usernameGold: {
-    fontSize: '16px',
     fontWeight: 600,
-    background: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
+    background: "linear-gradient(135deg,#ffd700,#ffed9e)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
   },
-  usernameDefault: {
-    fontSize: '16px',
-    fontWeight: 600,
-    color: '#333',
-  },
+  usernameDefault: { fontWeight: 600 },
   timer: {
-    fontSize: '14px',
-    color: '#666',
-    background: 'rgba(0, 0, 0, 0.1)',
-    padding: '4px 8px',
-    borderRadius: '4px',
+    background: "rgba(0,0,0,0.1)",
+    padding: "4px 8px",
+    borderRadius: 4,
   },
-  seatsContainer: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '15px',
-  },
+  seatsContainer: { display: "flex", gap: 10, marginTop: 15 },
   seatTaken: {
     flex: 1,
-    padding: '15px',
-    borderRadius: '8px',
-    background: 'rgba(144, 202, 249, 0.3)',
-    border: '2px solid #90caf9',
+    background: "rgba(144,202,249,.3)",
+    border: "2px solid #90caf9",
+    borderRadius: 8,
+    padding: 15,
   },
   seatOpen: {
     flex: 1,
-    padding: '15px',
-    borderRadius: '8px',
-    background: 'rgba(129, 212, 250, 0.2)',
-    border: '2px dashed #81d4fa',
+    background: "rgba(129,212,250,.2)",
+    border: "2px dashed #81d4fa",
+    borderRadius: 8,
+    padding: 15,
   },
-  seatLabel: {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: '#666',
-    marginBottom: '5px',
-  },
-  playerInfo: {
-    fontSize: '14px',
-    fontWeight: 500,
-    color: '#333',
-  },
-  divider: {
-    width: '2px',
-    background: 'rgba(0, 0, 0, 0.1)',
-  },
-  stats: {
-    fontSize: '14px',
-    color: '#666',
-    textAlign: 'center',
-  },
-  handsPlayed: {
-    fontSize: '12px',
-    marginLeft: '5px',
-  },
+  seatLabel: { fontSize: 12, fontWeight: 600, color: "#666" },
+  playerInfo: { marginTop: 5, fontWeight: 500 },
+  stats: { textAlign: "center", marginTop: 10, fontSize: 14 },
+  handsPlayed: { marginLeft: 6, fontSize: 12 },
   modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     zIndex: 1000,
   },
   modal: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '30px',
-    maxWidth: '500px',
-    width: '90%',
+    background: "white",
+    borderRadius: 16,
+    padding: 30,
+    width: "90%",
+    maxWidth: 500,
   },
-  modalTitle: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    color: '#333',
-  },
-  modalSubtitle: {
-    fontSize: '16px',
-    color: '#666',
-    marginBottom: '20px',
-  },
-  roleSelector: {
-    display: 'flex',
-    gap: '15px',
-    marginBottom: '30px',
-  },
+  modalTitle: { fontSize: 24, marginBottom: 20 },
+  roleSelector: { display: "flex", gap: 15, marginBottom: 30 },
   roleButton: {
     flex: 1,
-    padding: '20px',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '18px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
+    padding: 20,
+    border: "none",
+    borderRadius: 8,
+    cursor: "pointer",
+    fontSize: 18,
   },
-  modalActions: {
-    display: 'flex',
-    gap: '10px',
-  },
+  modalActions: { display: "flex", gap: 10 },
   cancelButton: {
     flex: 1,
-    padding: '12px',
-    background: 'rgba(0, 0, 0, 0.1)',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: 600,
-    cursor: 'pointer',
+    background: "rgba(0,0,0,.1)",
+    border: "none",
+    padding: 12,
+    borderRadius: 8,
   },
   confirmButton: {
     flex: 1,
-    padding: '12px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: 600,
-    color: 'white',
-    cursor: 'pointer',
+    background: "linear-gradient(135deg,#667eea,#764ba2)",
+    color: "white",
+    border: "none",
+    padding: 12,
+    borderRadius: 8,
   },
 };
