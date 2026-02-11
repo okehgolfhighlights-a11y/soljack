@@ -16,11 +16,17 @@ interface GameState {
   gamePhase: "betting" | "player_turn" | "dealer_turn" | "finished";
   message: string;
   bankroll: number;
+  isReshuffling: boolean;
+}
+
+interface Props {
+  onExit: () => void;
 }
 
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
 const RANKS: Rank[] = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
 const BET_AMOUNT = 0.05;
+const RESHUFFLE_DELAY = 5000;
 
 function createDeck(): Card[] {
   const deck: Card[] = [];
@@ -74,44 +80,61 @@ function isBlackjack(hand: Card[]): boolean {
   return hand.length === 2 && calculateHandValue(hand) === 21;
 }
 
-export default function PracticeTable() {
+export default function PracticeTable({ onExit }: Props) {
   const [state, setState] = useState<GameState>(() => {
     const savedBankroll = localStorage.getItem("practice_bankroll");
+    const savedDeck = localStorage.getItem("practice_deck");
+    
     return {
-      deck: shuffleDeck(createDeck()),
+      deck: savedDeck ? JSON.parse(savedDeck) : shuffleDeck(createDeck()),
       playerHand: [],
       dealerHand: [],
       gamePhase: "betting",
       message: "",
       bankroll: savedBankroll ? parseFloat(savedBankroll) : 1.0,
+      isReshuffling: false,
     };
   });
 
+  // Persist bankroll and deck to localStorage
   useEffect(() => {
     localStorage.setItem("practice_bankroll", state.bankroll.toFixed(2));
-  }, [state.bankroll]);
+    localStorage.setItem("practice_deck", JSON.stringify(state.deck));
+  }, [state.bankroll, state.deck]);
 
   const playerValue = useMemo(() => calculateHandValue(state.playerHand), [state.playerHand]);
   const dealerValue = useMemo(() => calculateHandValue(state.dealerHand), [state.dealerHand]);
 
-  const drawCards = useCallback((count: number, currentDeck: Card[]): [Card[], Card[]] => {
+  const drawCards = useCallback((count: number, currentDeck: Card[]): [Card[], Card[], boolean] => {
     let deck = [...currentDeck];
     const drawn: Card[] = [];
+    let needsReshuffle = false;
 
     for (let i = 0; i < count; i++) {
       if (deck.length === 0) {
+        needsReshuffle = true;
         deck = shuffleDeck(createDeck());
       }
       drawn.push(deck[0]);
       deck = deck.slice(1);
     }
 
-    return [drawn, deck];
+    return [drawn, deck, needsReshuffle];
   }, []);
 
   const dealNewHand = useCallback(() => {
     setState((prev) => {
-      const [cards, newDeck] = drawCards(4, prev.deck);
+      const [cards, newDeck, needsReshuffle] = drawCards(4, prev.deck);
+
+      // If we needed to reshuffle during the draw, show reshuffle modal
+      if (needsReshuffle) {
+        return {
+          ...prev,
+          isReshuffling: true,
+          deck: newDeck,
+        };
+      }
+
       const playerHand = [cards[0], cards[2]];
       const dealerHand = [cards[1], cards[3]];
 
@@ -140,6 +163,7 @@ export default function PracticeTable() {
           gamePhase: "finished",
           message,
           bankroll: parseFloat((prev.bankroll + bankrollDelta).toFixed(2)),
+          isReshuffling: false,
         };
       }
 
@@ -150,6 +174,7 @@ export default function PracticeTable() {
         gamePhase: "player_turn",
         message: "",
         bankroll: prev.bankroll,
+        isReshuffling: false,
       };
     });
   }, [drawCards]);
@@ -158,7 +183,16 @@ export default function PracticeTable() {
     setState((prev) => {
       if (prev.gamePhase !== "player_turn") return prev;
 
-      const [cards, newDeck] = drawCards(1, prev.deck);
+      const [cards, newDeck, needsReshuffle] = drawCards(1, prev.deck);
+
+      if (needsReshuffle) {
+        return {
+          ...prev,
+          isReshuffling: true,
+          deck: newDeck,
+        };
+      }
+
       const newHand = [...prev.playerHand, cards[0]];
       const value = calculateHandValue(newHand);
 
@@ -187,13 +221,24 @@ export default function PracticeTable() {
 
       let dealerHand = [...prev.dealerHand];
       let deck = [...prev.deck];
+      let needsReshuffle = false;
 
       while (calculateHandValue(dealerHand) < 17) {
         if (deck.length === 0) {
+          needsReshuffle = true;
           deck = shuffleDeck(createDeck());
         }
         dealerHand.push(deck[0]);
         deck = deck.slice(1);
+      }
+
+      if (needsReshuffle) {
+        return {
+          ...prev,
+          isReshuffling: true,
+          dealerHand,
+          deck,
+        };
       }
 
       const playerVal = calculateHandValue(prev.playerHand);
@@ -223,6 +268,7 @@ export default function PracticeTable() {
         gamePhase: "finished",
         message,
         bankroll: parseFloat((prev.bankroll + bankrollDelta).toFixed(2)),
+        isReshuffling: false,
       };
     });
   }, []);
@@ -231,31 +277,75 @@ export default function PracticeTable() {
     setState((prev) => ({
       ...prev,
       bankroll: 1.0,
+      deck: shuffleDeck(createDeck()),
     }));
     localStorage.setItem("practice_bankroll", "1.00");
   }, []);
 
+  // Auto-deal on initial mount
   useEffect(() => {
-    if (state.gamePhase === "betting" && state.playerHand.length === 0) {
+    if (state.gamePhase === "betting" && state.playerHand.length === 0 && !state.isReshuffling) {
       const timer = setTimeout(() => dealNewHand(), 100);
       return () => clearTimeout(timer);
     }
-  }, [state.gamePhase, state.playerHand.length, dealNewHand]);
+  }, [state.gamePhase, state.playerHand.length, state.isReshuffling, dealNewHand]);
+
+  // Auto-deal after hand finishes (2 second delay)
+  useEffect(() => {
+    if (state.gamePhase === "finished" && !state.isReshuffling) {
+      const timer = setTimeout(() => {
+        dealNewHand();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.gamePhase, state.isReshuffling, dealNewHand]);
+
+  // Handle reshuffle delay
+  useEffect(() => {
+    if (state.isReshuffling) {
+      const timer = setTimeout(() => {
+        setState(prev => ({
+          ...prev,
+          isReshuffling: false,
+        }));
+      }, RESHUFFLE_DELAY);
+      return () => clearTimeout(timer);
+    }
+  }, [state.isReshuffling]);
 
   const isPlayerTurn = state.gamePhase === "player_turn";
-  const isFinished = state.gamePhase === "finished";
+  const cardsRemaining = state.deck.length;
 
   return (
     <div style={styles.container}>
+      {/* Reshuffle Modal */}
+      {state.isReshuffling && (
+        <div style={styles.reshuffleOverlay}>
+          <div style={styles.reshuffleModal}>
+            <div style={styles.reshuffleIcon}>🔄</div>
+            <h2 style={styles.reshuffleTitle}>Shuffling Deck...</h2>
+            <p style={styles.reshuffleText}>
+              The deck has been depleted and is being reshuffled.
+            </p>
+            <div style={styles.reshuffleTimer}>5 seconds</div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.table}>
         {/* Bankroll Display */}
         <div style={styles.bankrollBar}>
           <div style={styles.bankrollText}>
             Bankroll: <strong>{state.bankroll.toFixed(2)} SOL</strong>
           </div>
-          <button style={styles.resetButton} onClick={resetBankroll}>
-            Reset
-          </button>
+          <div style={styles.topRight}>
+            <div style={styles.cardCounter}>
+              Cards Left: <strong>{cardsRemaining}</strong>
+            </div>
+            <button style={styles.resetButton} onClick={resetBankroll}>
+              Reset
+            </button>
+          </div>
         </div>
 
         {/* Dealer Section */}
@@ -271,7 +361,11 @@ export default function PracticeTable() {
                   zIndex: index,
                 }}
               >
-                <PlayingCard card={card} />
+                {index === 1 && state.gamePhase === "player_turn" ? (
+                  <CardBack />
+                ) : (
+                  <PlayingCard card={card} />
+                )}
               </div>
             ))}
           </div>
@@ -334,12 +428,11 @@ export default function PracticeTable() {
           <button
             style={{
               ...styles.button,
-              ...(isFinished ? styles.buttonDeal : styles.buttonDisabled),
+              ...styles.buttonLobby,
             }}
-            onClick={dealNewHand}
-            disabled={!isFinished}
+            onClick={onExit}
           >
-            New Hand
+            Lobby
           </button>
         </div>
       </div>
@@ -368,6 +461,16 @@ function PlayingCard({ card }: { card: Card }) {
   );
 }
 
+function CardBack() {
+  return (
+    <div style={styles.card}>
+      <div style={styles.cardBackPattern}>
+        🂠
+      </div>
+    </div>
+  );
+}
+
 const styles: { [key: string]: React.CSSProperties } = {
   container: {
     minHeight: "100vh",
@@ -376,6 +479,52 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "center",
     background: "linear-gradient(135deg, #1a5f3f 0%, #0d3d28 100%)",
     padding: "20px",
+    position: "relative",
+  },
+  reshuffleOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0, 0, 0, 0.85)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10000,
+  },
+  reshuffleModal: {
+    background: "linear-gradient(135deg, #2d5016 0%, #1a3a0f 100%)",
+    borderRadius: "20px",
+    padding: "50px 60px",
+    textAlign: "center",
+    border: "4px solid #ffd700",
+    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.8)",
+  },
+  reshuffleIcon: {
+    fontSize: "72px",
+    marginBottom: "20px",
+  },
+  reshuffleTitle: {
+    fontSize: "32px",
+    fontWeight: 700,
+    color: "#ffd700",
+    marginBottom: "16px",
+    textShadow: "0 2px 8px rgba(0, 0, 0, 0.5)",
+  },
+  reshuffleText: {
+    fontSize: "18px",
+    color: "#fff",
+    marginBottom: "24px",
+  },
+  reshuffleTimer: {
+    fontSize: "24px",
+    fontWeight: 700,
+    color: "#4caf50",
+    background: "rgba(76, 175, 80, 0.2)",
+    padding: "12px 24px",
+    borderRadius: "8px",
+    display: "inline-block",
   },
   table: {
     width: "100%",
@@ -399,6 +548,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   bankrollText: {
     color: "#ffd700",
     fontSize: "18px",
+    fontWeight: 600,
+    textShadow: "0 2px 4px rgba(0,0,0,0.5)",
+  },
+  topRight: {
+    display: "flex",
+    gap: "16px",
+    alignItems: "center",
+  },
+  cardCounter: {
+    color: "#90caf9",
+    fontSize: "16px",
     fontWeight: 600,
     textShadow: "0 2px 4px rgba(0,0,0,0.5)",
   },
@@ -525,15 +685,29 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: "#fff",
     boxShadow: "0 4px 12px rgba(76, 175, 80, 0.4)",
   },
-  buttonDeal: {
-    background: "linear-gradient(135deg, #2196f3 0%, #1976d2 100%)",
+  buttonLobby: {
+    background: "linear-gradient(135deg, #ff9800 0%, #f57c00 100%)",
     color: "#fff",
-    boxShadow: "0 4px 12px rgba(33, 150, 243, 0.4)",
+    boxShadow: "0 4px 12px rgba(255, 152, 0, 0.4)",
   },
   buttonDisabled: {
     background: "#555",
     color: "#888",
     cursor: "not-allowed",
     opacity: 0.5,
+  },
+    cardBackPattern: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "linear-gradient(135deg, #1976d2 0%, #0d47a1 100%)",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "64px",
+    color: "rgba(255, 255, 255, 0.3)",
   },
 };
