@@ -1,38 +1,66 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-type OnlineMsg =
-  | { type: "online_count"; count: number }
-  | { type: "ping" }
-  | { type: "pong" }
-  | { type: string; [k: string]: any };
+type Role = "dealer" | "player";
+
+interface QueueStatus {
+  inQueue: boolean;
+  betTier: number;
+  role: Role | null;
+}
 
 interface GameContextValue {
+  // Online indicator
   onlineCount: number;
   wsStatus: "connecting" | "open" | "closed" | "error";
+
+  // Queue system
+  joinQueue: (betTier: number, role: Role) => Promise<void>;
+  leaveQueue: () => Promise<void>;
+  queueStatus: QueueStatus | null;
+
+  // Private matches
+  createPrivateMatch: (betTier: number, role: Role) => Promise<string>;
+  joinPrivateMatch: (code: string, role: Role) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
 
+/* =========================================================
+   WEBSOCKET URL
+========================================================= */
 function deriveWsUrl(): string | null {
-  // Prefer explicit env var for prod (recommended)
   const envUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
   if (envUrl && envUrl.trim()) return envUrl.trim();
 
-  // Fallback: same host, /ws
   if (typeof window === "undefined") return null;
+
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${window.location.host}/ws`;
+  return '${proto}://${window.location.host}/ws';
 }
 
+/* =========================================================
+   PROVIDER
+========================================================= */
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [onlineCount, setOnlineCount] = useState<number>(0);
-  const [wsStatus, setWsStatus] = useState<GameContextValue["wsStatus"]>("connecting");
+  const [wsStatus, setWsStatus] =
+    useState<GameContextValue["wsStatus"]>("connecting");
+
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const retryRef = useRef<number>(0);
-  const pingTimerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
 
+  /* =========================================================
+     WEBSOCKET CONNECT
+  ========================================================= */
   useEffect(() => {
     const wsUrl = deriveWsUrl();
     if (!wsUrl) return;
@@ -41,6 +69,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     const connect = () => {
       if (!alive) return;
+
       try {
         setWsStatus("connecting");
         const ws = new WebSocket(wsUrl);
@@ -48,39 +77,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
         ws.onopen = () => {
           if (!alive) return;
-          retryRef.current = 0;
           setWsStatus("open");
-
-          // Ask server for latest count (optional)
-          try {
-            ws.send(JSON.stringify({ type: "get_online_count" }));
-          } catch {}
-
-          // Heartbeat every 15s (server can ignore)
-          if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
-          pingTimerRef.current = window.setInterval(() => {
-            try {
-              ws.send(JSON.stringify({ type: "ping" }));
-            } catch {}
-          }, 15000);
         };
 
         ws.onmessage = (ev) => {
-          if (!alive) return;
-          let data: OnlineMsg | null = null;
           try {
-            data = JSON.parse(ev.data);
+            const data = JSON.parse(ev.data);
+            if (data.type === "online_count") {
+              setOnlineCount(data.count);
+            }
           } catch {
-            return;
-          }
-          if (!data) return;
-
-          if (data.type === "online_count" && typeof (data as any).count === "number") {
-            setOnlineCount((data as any).count);
-          }
-
-          if (data.type === "pong") {
-            // no-op
+            // ignore bad packets
           }
         };
 
@@ -92,16 +99,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         ws.onclose = () => {
           if (!alive) return;
           setWsStatus("closed");
-          if (pingTimerRef.current) {
-            window.clearInterval(pingTimerRef.current);
-            pingTimerRef.current = null;
-          }
 
-          // Exponential-ish backoff: 0.5s, 1s, 2s, 3s, 5s max
-          retryRef.current += 1;
-          const delay = Math.min(5000, 500 * Math.pow(2, Math.min(4, retryRef.current - 1)));
-          if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
-          reconnectTimerRef.current = window.setTimeout(connect, delay);
+          reconnectTimerRef.current = window.setTimeout(() => {
+            connect();
+          }, 1500);
         };
       } catch {
         setWsStatus("error");
@@ -112,22 +113,73 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       alive = false;
-      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
-      if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
-      try {
-        wsRef.current?.close();
-      } catch {}
-      wsRef.current = null;
+      if (reconnectTimerRef.current)
+        window.clearTimeout(reconnectTimerRef.current);
+      wsRef.current?.close();
     };
   }, []);
 
-  const value = useMemo(() => ({ onlineCount, wsStatus }), [onlineCount, wsStatus]);
+  /* =========================================================
+     QUEUE SYSTEM (SIMULATED SAFE VERSION)
+  ========================================================= */
+  async function joinQueue(betTier: number, role: Role) {
+    setQueueStatus({
+      inQueue: true,
+      betTier,
+      role,
+    });
+  }
+
+  async function leaveQueue() {
+    setQueueStatus(null);
+  }
+
+  /* =========================================================
+     PRIVATE MATCH SYSTEM (SAFE STUB VERSION)
+  ========================================================= */
+  async function createPrivateMatch(
+    betTier: number,
+    role: Role
+  ): Promise<string> {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setQueueStatus({
+      inQueue: true,
+      betTier,
+      role,
+    });
+    return code;
+  }
+
+  async function joinPrivateMatch(code: string, role: Role) {
+    setQueueStatus({
+      inQueue: true,
+      betTier: 1,
+      role,
+    });
+  }
+
+  const value = useMemo(
+    () => ({
+      onlineCount,
+      wsStatus,
+      joinQueue,
+      leaveQueue,
+      queueStatus,
+      createPrivateMatch,
+      joinPrivateMatch,
+    }),
+    [onlineCount, wsStatus, queueStatus]
+  );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 
+/* =========================================================
+   HOOK
+========================================================= */
 export function useGame() {
   const ctx = useContext(GameContext);
-  if (!ctx) throw new Error("useGame must be used within a GameProvider");
+  if (!ctx)
+    throw new Error("useGame must be used within a GameProvider");
   return ctx;
 }
