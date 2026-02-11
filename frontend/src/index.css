@@ -60,3 +60,63 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(102, 126, 234, 0.7);
 }
+
+/* ===============================
+   SOLJACK CARD LAYOUT FIX
+   =============================== */
+
+/* Hand container — forces side-by-side cards */
+.sj-hand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Individual card */
+.sj-card {
+  width: 72px;
+  height: 100px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Card faces */
+.sj-card-front,
+.sj-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 8px;
+}
+
+/* ===============================
+   TABLE LAYOUT
+   =============================== */
+
+.sj-table {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ===============================
+   PLAYER / DEALER SECTIONS
+   =============================== */
+
+.sj-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sj-section-title {
+  font-weight: 700;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 12px;
+}

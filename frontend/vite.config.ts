@@ -1,29 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
->>>>>>> Stashed changes
-=======
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
->>>>>>> Stashed changes
-=======
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
->>>>>>> Stashed changes
 
 export default defineConfig({
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  plugins: [react()],
-
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   plugins: [
     react(),
     nodePolyfills({
@@ -37,13 +16,6 @@ export default defineConfig({
       },
     }),
   ],
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   server: {
     port: 8080,
   },

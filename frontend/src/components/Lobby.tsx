@@ -1,525 +1,162 @@
-<<<<<<< Updated upstream
-import { useEffect, useState } from "react";
-import { useGame } from "../context/GameContext";
-
-interface CreatorStats {
-  wins: number;
-  losses: number;
-  totalHands: number;
-}
-=======
 import { useState, useEffect } from 'react';
-import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useGame } from '../context/GameContext';
-import { useGameProgram, findTablePda, FEE_DESTINATION, SystemProgram, BN } from '../lib/anchor';
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+import PrivateMatchModal from './PrivateMatchModal';
 
-interface OpenTable {
-  tableId: string;
-  betAmount: number;
-  creator: string;
-  creatorUsername: string | null;
-  creatorRole: "DEALER" | "PLAYER";
-  openRole: "DEALER" | "PLAYER";
-  creatorStats: CreatorStats;
-  timeRemaining: number;
-  createdAt: number;
-}
-
-interface Props {
+interface LobbyProps {
   betTier: number;
 }
 
-export default function Lobby({ betTier }: Props) {
+export default function Lobby({ betTier }: LobbyProps) {
   const { publicKey } = useWallet();
-  const program = useGameProgram();
-  const [openTables, setOpenTables] = useState<OpenTable[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateTable, setShowCreateTable] = useState(false);
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-
-  const { setCurrentTableId } = useGame();
-
-  useEffect(() => {
-    let alive = true;
-
-    const fetchTables = async () => {
-      try {
-        const res = await fetch(
-          '${import.meta.env.VITE_BACKEND_URL}/tables/open?betAmount=${betTier * 1e9}'
-        );
-        const data = await res.json();
-        if (alive) setOpenTables(data.tables || []);
-      } catch (err) {
-        console.error("Failed to fetch tables", err);
-        if (alive) setOpenTables([]);
-      } finally {
-        if (alive) setLoading(false);
-=======
-  const [joiningTable, setJoiningTable] = useState<string | null>(null);
-  const { setCurrentTableId } = useGame();
+  const { 
+    joinQueue, 
+    leaveQueue, 
+    queueStatus, 
+    createPrivateMatch,
+    joinPrivateMatch 
+  } = useGame();
+  
+  const [selectedRole, setSelectedRole] = useState<'dealer' | 'player' | null>(null);
+  const [isInQueue, setIsInQueue] = useState(false);
+  const [showPrivateModal, setShowPrivateModal] = useState(false);
 
   useEffect(() => {
-=======
-  const [joiningTable, setJoiningTable] = useState<string | null>(null);
-  const { setCurrentTableId } = useGame();
-
-  useEffect(() => {
->>>>>>> Stashed changes
-=======
-  const [joiningTable, setJoiningTable] = useState<string | null>(null);
-  const { setCurrentTableId } = useGame();
-
-  useEffect(() => {
->>>>>>> Stashed changes
-    const fetchTables = async () => {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        const response = await fetch(`${apiUrl}/tables/open?betAmount=${Math.floor(betTier * 1e9)}`);
-        if (!response.ok) {
-          console.warn('Failed to fetch tables from backend');
-          return;
-        }
-        const data = await response.json();
-        setOpenTables(data.tables || []);
-      } catch (error) {
-        console.error('Error fetching tables:', error);
-        setOpenTables([]);
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-      }
-    };
-
-    fetchTables();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-    const interval = setInterval(fetchTables, 5000);
-
-    return () => {
-      alive = false;
-      clearInterval(interval);
-    };
-  }, [betTier]);
-
-  const handleJoinTable = (tableId: string) => {
-    setCurrentTableId(tableId);
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchTables, 5000);
-    return () => clearInterval(interval);
-  }, [betTier]);
-
-  const handleCreateTable = () => {
-    setShowCreateTable(true);
-  };
-
-  const handleJoinTable = async (tableId: string) => {
-    if (!publicKey || !program) {
-      alert('Please connect your wallet');
-      return;
+    // Check if we're already in queue for this tier
+    const inQueue = queueStatus?.betTier === betTier && queueStatus?.inQueue;
+    setIsInQueue(!!inQueue);
+    if (inQueue) {
+      setSelectedRole(queueStatus?.role || null);
     }
+  }, [queueStatus, betTier]);
 
-    setJoiningTable(tableId);
-
+  const handleJoinQueue = async (role: 'dealer' | 'player') => {
+    if (!publicKey) return;
+    
+    setSelectedRole(role);
     try {
-      // The tableId IS the table PDA address
-      const tablePda = new PublicKey(tableId);
-
-      // Fetch table account to get creator address
-      const tableAccount = await program.account.tableAccount.fetch(tablePda);
-      const creatorPubkey = tableAccount.creator;
-
-      console.log('Joining table:', tableId);
-      console.log('Creator:', creatorPubkey.toString());
-
-      // Call join_table instruction
-      const tx = await program.methods
-        .joinTable()
-        .accounts({
-          opponent: publicKey,
-          creator: creatorPubkey,
-          tableAccount: tablePda,
-          feeDestination: FEE_DESTINATION,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      console.log('Joined table! Transaction:', tx);
-
-      // Navigate to table view
-      setCurrentTableId(tableId);
-    } catch (err: any) {
-      console.error('Failed to join table:', err);
-
-      let errorMsg = 'Failed to join table';
-      if (err.message?.includes('insufficient')) {
-        errorMsg = 'Insufficient SOL balance';
-      } else if (err.message?.includes('full')) {
-        errorMsg = 'Table is full';
-      } else if (err.message) {
-        errorMsg = err.message;
-      }
-
-      alert(errorMsg);
-    } finally {
-      setJoiningTable(null);
+      await joinQueue(betTier, role);
+      setIsInQueue(true);
+    } catch (err) {
+      console.error('Failed to join queue:', err);
+      setSelectedRole(null);
     }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   };
+
+  const handleLeaveQueue = async () => {
+    try {
+      await leaveQueue();
+      setIsInQueue(false);
+      setSelectedRole(null);
+    } catch (err) {
+      console.error('Failed to leave queue:', err);
+    }
+  };
+
+  const handleCreatePrivate = async (role: 'dealer' | 'player') => {
+    if (!publicKey) return;
+    
+    try {
+      const matchCode = await createPrivateMatch(betTier, role);
+      setShowPrivateModal(false);
+      // Show the match code to the user
+      alert(`Private match created! Share this code: ${matchCode}`);
+    } catch (err) {
+      console.error('Failed to create private match:', err);
+    }
+  };
+
+  const handleJoinPrivate = async (matchCode: string, role: 'dealer' | 'player') => {
+    if (!publicKey) return;
+    
+    try {
+      await joinPrivateMatch(matchCode, role);
+      setShowPrivateModal(false);
+    } catch (err) {
+      console.error('Failed to join private match:', err);
+      alert('Failed to join match. Invalid code or match already full.');
+    }
+  };
+
+  const betAmount = betTier * 0.01; // Convert tier to SOL amount
+
+  if (isInQueue) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.queueCard}>
+          <div style={styles.spinnerContainer}>
+            <div style={styles.spinner}></div>
+          </div>
+          <h2 style={styles.queueTitle}>Finding opponent...</h2>
+          <p style={styles.queueInfo}>
+            Role: <strong>{selectedRole === 'dealer' ? 'Dealer' : 'Player'}</strong>
+            <br />
+            Bet Amount: <strong>{betAmount} SOL</strong>
+          </p>
+          <button onClick={handleLeaveQueue} style={styles.leaveButton}>
+            Leave Queue
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h2 style={styles.title}>{betTier} SOL Tables</h2>
-        <button style={styles.createButton} onClick={() => setShowCreateTable(true)}>
-          Create Table
+        <h2 style={styles.title}>Choose Your Role</h2>
+        <p style={styles.subtitle}>Bet Amount: {betAmount} SOL per hand</p>
+      </div>
+
+      <div style={styles.roleCards}>
+        <div style={styles.roleCard}>
+          <div style={styles.roleIcon}>🎰</div>
+          <h3 style={styles.roleTitle}>Dealer</h3>
+          <p style={styles.roleDescription}>
+            House advantage. Hit on 16, stand on 17. 
+            Win on pushes. Slightly better odds.
+          </p>
+          <button 
+            onClick={() => handleJoinQueue('dealer')} 
+            style={styles.roleButton}
+          >
+            Join as Dealer
+          </button>
+        </div>
+
+        <div style={styles.roleCard}>
+          <div style={styles.roleIcon}>🎴</div>
+          <h3 style={styles.roleTitle}>Player</h3>
+          <p style={styles.roleDescription}>
+            Traditional blackjack player. 
+            Full control over hit/stand decisions.
+          </p>
+          <button 
+            onClick={() => handleJoinQueue('player')} 
+            style={styles.roleButton}
+          >
+            Join as Player
+          </button>
+        </div>
+      </div>
+
+      <div style={styles.privateMatchSection}>
+        <button 
+          onClick={() => setShowPrivateModal(true)} 
+          style={styles.privateButton}
+        >
+          Create/Join Private Match
         </button>
       </div>
 
-      {loading ? (
-        <div style={styles.loading}>Loading tables…</div>
-      ) : (
-        <div style={styles.tableGrid}>
-          {openTables.length === 0 ? (
-            <div style={styles.emptyState}>
-              <p>No open tables at this tier.</p>
-              <p>Be the first to create one.</p>
-            </div>
-          ) : (
-            openTables.map((table) => (
-              <TableCard
-                key={table.tableId}
-                table={table}
-                onJoin={handleJoinTable}
-              />
-            ))
-          )}
-        </div>
-      )}
-
-      {showCreateTable && (
-        <CreateTableModal
+      {showPrivateModal && (
+        <PrivateMatchModal
           betTier={betTier}
-          onClose={() => setShowCreateTable(false)}
-          onCreated={(id) => setCurrentTableId(id)}
+          onClose={() => setShowPrivateModal(false)}
+          onCreateMatch={handleCreatePrivate}
+          onJoinMatch={handleJoinPrivate}
         />
       )}
-<<<<<<< Updated upstream
-=======
-
-      <div style={styles.tableGrid}>
-        {openTables.length === 0 ? (
-          <div style={styles.emptyState}>
-            <p>No open tables at this bet tier.</p>
-            <p>Be the first to create one!</p>
-          </div>
-        ) : (
-          openTables.map((table) => (
-            <TableCard
-              key={table.tableId}
-              table={table}
-              onJoin={handleJoinTable}
-              isJoining={joiningTable === table.tableId}
-            />
-          ))
-        )}
-      </div>
->>>>>>> Stashed changes
-    </div>
-  );
-}
-
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-/* =======================
-   TABLE CARD
-======================= */
-
-function TableCard({
-  table,
-  onJoin,
-}: {
-  table: OpenTable;
-  onJoin: (id: string) => void;
-}) {
-=======
-function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
->>>>>>> Stashed changes
-=======
-function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
->>>>>>> Stashed changes
-=======
-function TableCard({ table, onJoin, isJoining }: { table: OpenTable; onJoin: (id: string) => void; isJoining?: boolean }) {
->>>>>>> Stashed changes
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return '${m}:${s.toString().padStart(2, "0")}';
-  };
-
-  return (
-    <div
-      style={{...styles.tableCard, opacity: isJoining ? 0.6 : 1}}
-      onClick={() => !isJoining && onJoin(table.tableId)}
-    >
-      <div style={styles.cardHeader}>
-        <span style={table.creatorUsername ? styles.usernameGold : styles.usernameDefault}>
-          {table.creatorUsername ??
-            `${table.creator.slice(0, 4)}…${table.creator.slice(-4)}`}
-        </span>
-        <span style={styles.timer}>{formatTime(table.timeRemaining)}</span>
-      </div>
-
-      <div style={styles.seatsContainer}>
-        <Seat
-          label="DEALER"
-          taken={table.creatorRole === "DEALER"}
-          name={
-            table.creatorRole === "DEALER"
-              ? table.creatorUsername ?? table.creator.slice(0, 4)
-              : null
-          }
-        />
-        <Seat
-          label="PLAYER"
-          taken={table.creatorRole === "PLAYER"}
-          name={
-            table.creatorRole === "PLAYER"
-              ? table.creatorUsername ?? table.creator.slice(0, 4)
-              : null
-          }
-        />
-      </div>
-
-      <div style={styles.stats}>
-        {table.creatorStats.wins}W / {table.creatorStats.losses}L
-        <span style={styles.handsPlayed}>
-          ({table.creatorStats.totalHands} hands)
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function Seat({
-  label,
-  taken,
-  name,
-}: {
-  label: string;
-  taken: boolean;
-  name: string | null;
-}) {
-  return (
-    <div style={taken ? styles.seatTaken : styles.seatOpen}>
-      <div style={styles.seatLabel}>{label}</div>
-      {name && <div style={styles.playerInfo}>{name}</div>}
-    </div>
-  );
-}
-
-/* =======================
-   CREATE TABLE MODAL
-======================= */
-
-function CreateTableModal({
-  betTier,
-  onClose,
-  onCreated,
-}: {
-  betTier: number;
-  onClose: () => void;
-  onCreated: (id: string) => void;
-}) {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  const [role, setRole] = useState<"DEALER" | "PLAYER" | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const handleCreate = async () => {
-    if (!role) return;
-    setCreating(true);
-
-    try {
-      // TEMP mock until backend instruction wired
-      const mockId = 'table_${Date.now()}';
-      onCreated(mockId);
-      onClose();
-    } catch (err) {
-      console.error("Create table failed", err);
-    } finally {
-      setCreating(false);
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-  const { publicKey } = useWallet();
-  const program = useGameProgram();
-  const [selectedRole, setSelectedRole] = useState<'DEALER' | 'PLAYER' | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleCreate = async () => {
-    if (!selectedRole || !publicKey || !program) return;
-
-    setIsCreating(true);
-    setError('');
-
-    try {
-      // Generate a unique table seed based on timestamp
-      const tableSeed = new BN(Date.now());
-
-      // Convert bet tier (in SOL) to lamports
-      const betAmountLamports = new BN(betTier * 1e9);
-
-      // Find table PDA
-      const [tablePda] = findTablePda(program.programId, tableSeed);
-
-      console.log('Creating table...');
-      console.log('Table PDA:', tablePda.toString());
-      console.log('Bet amount:', betAmountLamports.toString(), 'lamports');
-      console.log('Role:', selectedRole);
-
-      // Create role enum object
-      const role = selectedRole === 'DEALER' ? { dealer: {} } : { player: {} };
-
-      // Call create_table instruction
-      const tx = await program.methods
-        .createTable(betAmountLamports, role, tableSeed)
-        .accounts({
-          creator: publicKey,
-          tableAccount: tablePda,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
-
-      console.log('Table created! Transaction:', tx);
-
-      // Use the table PDA as the table ID
-      onCreated(tablePda.toString());
-      onClose();
-    } catch (err: any) {
-      console.error('Failed to create table:', err);
-
-      let errorMsg = 'Failed to create table';
-      if (err.message?.includes('insufficient')) {
-        errorMsg = 'Insufficient SOL balance';
-      } else if (err.message) {
-        errorMsg = err.message;
-      }
-
-      setError(errorMsg);
-    } finally {
-      setIsCreating(false);
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-    }
-  };
-
-  return (
-    <div style={styles.modalOverlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={styles.modalTitle}>Create {betTier} SOL Table</h3>
-
-        <div style={styles.roleSelector}>
-          <button
-            style={{
-              ...styles.roleButton,
-              background: role === "DEALER" ? "#90caf9" : "rgba(255,255,255,0.5)",
-            }}
-            onClick={() => setRole("DEALER")}
-          >
-            Dealer
-          </button>
-          <button
-            style={{
-              ...styles.roleButton,
-              background: role === "PLAYER" ? "#90caf9" : "rgba(255,255,255,0.5)",
-            }}
-            onClick={() => setRole("PLAYER")}
-          >
-            Player
-          </button>
-        </div>
-
-        {error && <div style={{ color: '#f44336', marginBottom: '10px', fontSize: '14px' }}>{error}</div>}
-
-        <div style={styles.modalActions}>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-          <button style={styles.cancelButton} onClick={onClose}>
-            Cancel
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-          <button style={styles.cancelButton} onClick={onClose} disabled={isCreating}>
-            Back
->>>>>>> Stashed changes
-          </button>
-          <button
-            style={styles.confirmButton}
-            disabled={!role || creating}
-            onClick={handleCreate}
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-          >
-            {creating ? "Creating…" : "Create"}
-=======
-            disabled={!selectedRole || isCreating}
-          >
-            {isCreating ? 'Creating...' : 'Create Table'}
->>>>>>> Stashed changes
-=======
-            disabled={!selectedRole || isCreating}
-          >
-            {isCreating ? 'Creating...' : 'Create Table'}
->>>>>>> Stashed changes
-=======
-            disabled={!selectedRole || isCreating}
-          >
-            {isCreating ? 'Creating...' : 'Create Table'}
->>>>>>> Stashed changes
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -528,110 +165,139 @@ function CreateTableModal({
    STYLES
 ======================= */
 
-const styles: { [k: string]: React.CSSProperties } = {
-  container: { maxWidth: 1200, margin: "0 auto", padding: 20 },
+const styles: { [key: string]: React.CSSProperties } = {
+  container: {
+    maxWidth: '900px',
+    margin: '0 auto',
+    padding: '40px 20px',
+  },
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 30,
+    textAlign: 'center',
+    marginBottom: '40px',
   },
-  title: { fontSize: 28, fontWeight: "bold" },
-  createButton: {
-    background: "linear-gradient(135deg,#667eea,#764ba2)",
-    color: "white",
-    border: "none",
-    borderRadius: 8,
-    padding: "12px 24px",
-    cursor: "pointer",
+  title: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: '8px',
   },
-  loading: { textAlign: "center", padding: 60, fontSize: 18 },
-  tableGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))",
-    gap: 20,
+  subtitle: {
+    fontSize: '18px',
+    color: '#666',
   },
-  emptyState: { textAlign: "center", color: "#666" },
-  tableCard: {
-    background: "rgba(255,255,255,0.65)",
-    backdropFilter: "blur(10px)",
-    borderRadius: 12,
-    padding: 20,
-    cursor: "pointer",
-    transition: "all .3s ease",
+  roleCards: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '24px',
+    marginBottom: '32px',
   },
-  cardHeader: { display: "flex", justifyContent: "space-between" },
-  usernameGold: {
-    fontWeight: 600,
-    background: "linear-gradient(135deg,#ffd700,#ffed9e)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
+  roleCard: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '32px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    textAlign: 'center',
+    transition: 'transform 0.2s, box-shadow 0.2s',
   },
-  usernameDefault: { fontWeight: 600 },
-  timer: {
-    background: "rgba(0,0,0,0.1)",
-    padding: "4px 8px",
-    borderRadius: 4,
+  roleIcon: {
+    fontSize: '64px',
+    marginBottom: '16px',
   },
-  seatsContainer: { display: "flex", gap: 10, marginTop: 15 },
-  seatTaken: {
-    flex: 1,
-    background: "rgba(144,202,249,.3)",
-    border: "2px solid #90caf9",
-    borderRadius: 8,
-    padding: 15,
+  roleTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: '12px',
   },
-  seatOpen: {
-    flex: 1,
-    background: "rgba(129,212,250,.2)",
-    border: "2px dashed #81d4fa",
-    borderRadius: 8,
-    padding: 15,
+  roleDescription: {
+    fontSize: '14px',
+    color: '#666',
+    lineHeight: '1.6',
+    marginBottom: '24px',
+    minHeight: '60px',
   },
-  seatLabel: { fontSize: 12, fontWeight: 600, color: "#666" },
-  playerInfo: { marginTop: 5, fontWeight: 500 },
-  stats: { textAlign: "center", marginTop: 10, fontSize: 14 },
-  handsPlayed: { marginLeft: 6, fontSize: 12 },
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,.5)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-  },
-  modal: {
-    background: "white",
-    borderRadius: 16,
-    padding: 30,
-    width: "90%",
-    maxWidth: 500,
-  },
-  modalTitle: { fontSize: 24, marginBottom: 20 },
-  roleSelector: { display: "flex", gap: 15, marginBottom: 30 },
   roleButton: {
-    flex: 1,
-    padding: 20,
-    border: "none",
-    borderRadius: 8,
-    cursor: "pointer",
-    fontSize: 18,
+    width: '100%',
+    padding: '14px 28px',
+    fontSize: '16px',
+    fontWeight: 600,
+    border: 'none',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    cursor: 'pointer',
+    transition: 'transform 0.2s',
   },
-  modalActions: { display: "flex", gap: 10 },
-  cancelButton: {
-    flex: 1,
-    background: "rgba(0,0,0,.1)",
-    border: "none",
-    padding: 12,
-    borderRadius: 8,
+  privateMatchSection: {
+    textAlign: 'center',
+    marginTop: '32px',
   },
-  confirmButton: {
-    flex: 1,
-    background: "linear-gradient(135deg,#667eea,#764ba2)",
-    color: "white",
-    border: "none",
-    padding: 12,
-    borderRadius: 8,
+  privateButton: {
+    padding: '12px 24px',
+    fontSize: '14px',
+    fontWeight: 600,
+    border: '2px solid #667eea',
+    borderRadius: '8px',
+    background: 'white',
+    color: '#667eea',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  queueCard: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '48px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    textAlign: 'center',
+    maxWidth: '400px',
+    margin: '0 auto',
+  },
+  spinnerContainer: {
+    marginBottom: '24px',
+  },
+  spinner: {
+    width: '60px',
+    height: '60px',
+    margin: '0 auto',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
+  queueTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: '16px',
+  },
+  queueInfo: {
+    fontSize: '16px',
+    color: '#666',
+    lineHeight: '1.8',
+    marginBottom: '32px',
+  },
+  leaveButton: {
+    padding: '12px 32px',
+    fontSize: '16px',
+    fontWeight: 600,
+    border: '2px solid #e53e3e',
+    borderRadius: '8px',
+    background: 'white',
+    color: '#e53e3e',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
   },
 };
+
+/* =======================
+   ANIMATIONS
+======================= */
+
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
