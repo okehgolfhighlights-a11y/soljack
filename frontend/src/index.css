@@ -160,3 +160,19 @@ code {
   will-change: transform;
   transform-style: preserve-3d;
 }
+
+.sj-online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sj-online-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #22c55e;
+}

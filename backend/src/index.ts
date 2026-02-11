@@ -6,10 +6,16 @@ import { config } from './config';
 import { initWebSocket } from './websocket';
 import { registerRoutes } from './routes';
 import { initIndexer } from './indexer';
+import { TournamentManager } from "./tournament/TournamentManager";
 
 const fastify = Fastify({
   logger: true,
 });
+
+const tournamentManager = new TournamentManager();
+tournamentManager.createTournament();
+
+initWebSocket(tournamentManager);
 
 // CORS
 fastify.register(cors, {

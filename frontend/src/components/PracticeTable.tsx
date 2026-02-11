@@ -1,32 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Suit = "♠️" | "♥️" | "♦️" | "♣️";
-type Rank = "A" | "K" | "Q" | "J" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2";
 
 interface Card {
   id: string;
-  rank: Rank;
   suit: Suit;
+  rank: string;
 }
 
 const SUITS: Suit[] = ["♠️", "♥️", "♦️", "♣️"];
-const RANKS: Rank[] = ["A","K","Q","J","10","9","8","7","6","5","4","3","2"];
+const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 
 function buildDeck(): Card[] {
   const deck: Card[] = [];
+
   for (const suit of SUITS) {
     for (const rank of RANKS) {
       deck.push({
-        id: '${rank}${suit}-${crypto.randomUUID()}',
-        rank,
+        id: crypto.randomUUID(),
         suit,
+        rank,
       });
     }
   }
+
   return shuffle(deck);
 }
 
-function shuffle(deck: Card[]) {
+function shuffle(deck: Card[]): Card[] {
   return [...deck].sort(() => Math.random() - 0.5);
 }
 
@@ -34,14 +35,14 @@ function handValue(hand: Card[]): number {
   let total = 0;
   let aces = 0;
 
-  for (const c of hand) {
-    if (c.rank === "A") {
+  for (const card of hand) {
+    if (card.rank === "A") {
       total += 11;
       aces++;
-    } else if (["K","Q","J"].includes(c.rank)) {
+    } else if (["K", "Q", "J"].includes(card.rank)) {
       total += 10;
     } else {
-      total += Number(c.rank);
+      total += Number(card.rank);
     }
   }
 
@@ -58,6 +59,7 @@ export default function PracticeTable() {
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [message, setMessage] = useState("");
+
   const [bankroll, setBankroll] = useState<number>(() => {
     const saved = localStorage.getItem("practice_bankroll");
     return saved ? Number(saved) : 1;
@@ -71,64 +73,63 @@ export default function PracticeTable() {
     resetGame();
   }, []);
 
-  const playerScore = useMemo(
-    () => handValue(playerHand),
-    [playerHand]
-  );
+  const playerScore = useMemo(() => handValue(playerHand), [playerHand]);
+  const dealerScore = useMemo(() => handValue(dealerHand), [dealerHand]);
 
-  const dealerScore = useMemo(
-    () => handValue(dealerHand),
-    [dealerHand]
-  );
-
-  function drawCard(): Card {
-    if (deck.length === 0) {
-      const fresh = buildDeck();
-      setDeck(fresh);
-      return fresh.pop()!;
-    }
-
-    const next = [...deck];
-    const card = next.pop()!;
-    setDeck(next);
-    return card;
+  function drawCard(currentDeck: Card[]): { card: Card; deck: Card[] } {
+    const nextDeck = [...currentDeck];
+    const card = nextDeck.pop()!;
+    return { card, deck: nextDeck };
   }
 
   function resetGame() {
     const newDeck = buildDeck();
-    setDeck(newDeck);
-    setPlayerHand([newDeck.pop()!, newDeck.pop()!]);
-    setDealerHand([newDeck.pop()!]);
+
+    const { card: p1, deck: d1 } = drawCard(newDeck);
+    const { card: p2, deck: d2 } = drawCard(d1);
+    const { card: dCard, deck: d3 } = drawCard(d2);
+
+    setDeck(d3);
+    setPlayerHand([p1, p2]);
+    setDealerHand([dCard]);
     setMessage("");
   }
 
   function hit() {
-    setPlayerHand(prev => [...prev, drawCard()]);
+    if (playerScore >= 21) return;
+
+    const { card, deck: nextDeck } = drawCard(deck);
+    setDeck(nextDeck);
+    setPlayerHand((prev) => [...prev, card]);
   }
 
   function stand() {
     let dealer = [...dealerHand];
+    let currentDeck = [...deck];
 
     while (handValue(dealer) < 17) {
-      dealer.push(drawCard());
+      const { card, deck: nextDeck } = drawCard(currentDeck);
+      dealer.push(card);
+      currentDeck = nextDeck;
     }
 
     setDealerHand(dealer);
+    setDeck(currentDeck);
 
     const p = handValue(playerHand);
     const d = handValue(dealer);
 
     if (p > 21) {
       setMessage("Bust! You lose.");
-      setBankroll(b => b - 0.05);
+      setBankroll((b) => b - 0.05);
     } else if (d > 21 || p > d) {
       setMessage("You win!");
-      setBankroll(b => b + 0.05);
+      setBankroll((b) => b + 0.05);
     } else if (p === d) {
       setMessage("Push.");
     } else {
       setMessage("Dealer wins.");
-      setBankroll(b => b - 0.05);
+      setBankroll((b) => b - 0.05);
     }
   }
 
@@ -143,19 +144,19 @@ export default function PracticeTable() {
 
       <p>Bankroll: {bankroll.toFixed(2)} ◎</p>
 
-      {/* DEALER HAND */}
+      {/* DEALER */}
       <div className="sj-hand">
-        {dealerHand.map(c => (
-          <div key={c.id} className="sj-card">
+        {dealerHand.map((c, i) => (
+          <div
+            key={c.id}
+            className="sj-card"
+            style={{ left: ${i * 36}px }}
+          >
             <div className="sj-card-front">
               <div className="sj-card-corner">
                 {c.rank}{c.suit}
               </div>
-
-              <div className="sj-card-suit">
-                {c.suit}
-              </div>
-
+              <div className="sj-card-suit">{c.suit}</div>
               <div className="sj-card-corner sj-card-corner-bottom">
                 {c.rank}{c.suit}
               </div>
@@ -164,19 +165,19 @@ export default function PracticeTable() {
         ))}
       </div>
 
-      {/* PLAYER HAND */}
+      {/* PLAYER */}
       <div className="sj-hand">
-        {playerHand.map(c => (
-          <div key={c.id} className="sj-card">
+        {playerHand.map((c, i) => (
+          <div
+            key={c.id}
+            className="sj-card"
+            style={{ left: ${i * 36}px }}
+          >
             <div className="sj-card-front">
               <div className="sj-card-corner">
                 {c.rank}{c.suit}
               </div>
-
-              <div className="sj-card-suit">
-                {c.suit}
-              </div>
-
+              <div className="sj-card-suit">{c.suit}</div>
               <div className="sj-card-corner sj-card-corner-bottom">
                 {c.rank}{c.suit}
               </div>

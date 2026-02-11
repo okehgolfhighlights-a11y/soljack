@@ -1,163 +1,133 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
-interface GameContextType {
-  username: string | null;
-  balance: number;
-  stats: {
-    wins: number;
-    losses: number;
-    totalHands: number;
-    rank: number | null;
-  };
-  currentTableId: string | null;
-  isAtTable: boolean;
-  setCurrentTableId: (id: string | null) => void;
-  refreshBalance: () => void;
-  refreshStats: () => void;
+type OnlineMsg =
+  | { type: "online_count"; count: number }
+  | { type: "ping" }
+  | { type: "pong" }
+  | { type: string; [k: string]: any };
+
+interface GameContextValue {
+  onlineCount: number;
+  wsStatus: "connecting" | "open" | "closed" | "error";
 }
 
-const GameContext = createContext<GameContextType | undefined>(undefined);
+const GameContext = createContext<GameContextValue | null>(null);
 
-export function GameProvider({ children }: { children: ReactNode }) {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
-  const [username, setUsername] = useState<string | null>(null);
-  const [balance, setBalance] = useState<number>(0);
-  const [stats, setStats] = useState({
-    wins: 0,
-    losses: 0,
-    totalHands: 0,
-    rank: null as number | null,
-  });
-  const [currentTableId, setCurrentTableId] = useState<string | null>(null);
-  const [ws, setWs] = useState<WebSocket | null>(null);
+function deriveWsUrl(): string | null {
+  // Prefer explicit env var for prod (recommended)
+  const envUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
+  if (envUrl && envUrl.trim()) return envUrl.trim();
 
-  const refreshBalance = async () => {
-    if (!publicKey) return;
-    try {
-      const bal = await connection.getBalance(publicKey);
-      setBalance(bal / 1e9); // Convert lamports to SOL
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-    }
-  };
+  // Fallback: same host, /ws
+  if (typeof window === "undefined") return null;
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${window.location.host}/ws`;
+}
 
-  const refreshStats = async () => {
-    if (!publicKey) return;
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/player/${publicKey.toString()}/stats`);
-      if (!response.ok) {
-        console.warn('Failed to fetch stats from backend, using defaults');
-        return;
-      }
-      const data = await response.json();
-      setStats({
-        wins: data.wins || 0,
-        losses: data.losses || 0,
-        totalHands: data.totalHands || 0,
-        rank: data.rank || null,
-      });
-      setUsername(data.username || null);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Keep default values on error
-    }
-  };
+export function GameProvider({ children }: { children: React.ReactNode }) {
+  const [onlineCount, setOnlineCount] = useState<number>(0);
+  const [wsStatus, setWsStatus] = useState<GameContextValue["wsStatus"]>("connecting");
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const retryRef = useRef<number>(0);
+  const pingTimerRef = useRef<number | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    refreshBalance();
-    refreshStats();
-  }, [publicKey]);
+    const wsUrl = deriveWsUrl();
+    if (!wsUrl) return;
 
-  // WebSocket connection
-  useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-    let websocket: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout;
+    let alive = true;
 
     const connect = () => {
+      if (!alive) return;
       try {
-        websocket = new WebSocket(wsUrl);
+        setWsStatus("connecting");
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-        websocket.onopen = () => {
-          console.log('✅ WebSocket connected');
-          setWs(websocket);
+        ws.onopen = () => {
+          if (!alive) return;
+          retryRef.current = 0;
+          setWsStatus("open");
 
-          // Subscribe to current table if any
-          if (currentTableId) {
-            websocket?.send(JSON.stringify({ event: 'subscribe', tableId: currentTableId }));
-          }
-        };
-
-        websocket.onmessage = (event) => {
+          // Ask server for latest count (optional)
           try {
-            const data = JSON.parse(event.data);
-            console.log('WebSocket message:', data);
-            // Handle events here (to be expanded)
-            // Events: table_created, player_joined, card_dealt, etc.
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            ws.send(JSON.stringify({ type: "get_online_count" }));
+          } catch {}
+
+          // Heartbeat every 15s (server can ignore)
+          if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
+          pingTimerRef.current = window.setInterval(() => {
+            try {
+              ws.send(JSON.stringify({ type: "ping" }));
+            } catch {}
+          }, 15000);
+        };
+
+        ws.onmessage = (ev) => {
+          if (!alive) return;
+          let data: OnlineMsg | null = null;
+          try {
+            data = JSON.parse(ev.data);
+          } catch {
+            return;
+          }
+          if (!data) return;
+
+          if (data.type === "online_count" && typeof (data as any).count === "number") {
+            setOnlineCount((data as any).count);
+          }
+
+          if (data.type === "pong") {
+            // no-op
           }
         };
 
-        websocket.onerror = (error) => {
-          console.error('WebSocket error:', error);
+        ws.onerror = () => {
+          if (!alive) return;
+          setWsStatus("error");
         };
 
-        websocket.onclose = () => {
-          console.log('⚠️ WebSocket disconnected, reconnecting in 5s...');
-          setWs(null);
-          reconnectTimeout = setTimeout(connect, 5000);
+        ws.onclose = () => {
+          if (!alive) return;
+          setWsStatus("closed");
+          if (pingTimerRef.current) {
+            window.clearInterval(pingTimerRef.current);
+            pingTimerRef.current = null;
+          }
+
+          // Exponential-ish backoff: 0.5s, 1s, 2s, 3s, 5s max
+          retryRef.current += 1;
+          const delay = Math.min(5000, 500 * Math.pow(2, Math.min(4, retryRef.current - 1)));
+          if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = window.setTimeout(connect, delay);
         };
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
-        reconnectTimeout = setTimeout(connect, 5000);
+      } catch {
+        setWsStatus("error");
       }
     };
 
     connect();
 
     return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (websocket) {
-        websocket.close();
-      }
+      alive = false;
+      if (reconnectTimerRef.current) window.clearTimeout(reconnectTimerRef.current);
+      if (pingTimerRef.current) window.clearInterval(pingTimerRef.current);
+      try {
+        wsRef.current?.close();
+      } catch {}
+      wsRef.current = null;
     };
   }, []);
 
-  // Subscribe/unsubscribe to table when currentTableId changes
-  useEffect(() => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const value = useMemo(() => ({ onlineCount, wsStatus }), [onlineCount, wsStatus]);
 
-    if (currentTableId) {
-      ws.send(JSON.stringify({ event: 'subscribe', tableId: currentTableId }));
-    }
-  }, [currentTableId, ws]);
-
-  return (
-    <GameContext.Provider
-      value={{
-        username,
-        balance,
-        stats,
-        currentTableId,
-        isAtTable: currentTableId !== null,
-        setCurrentTableId,
-        refreshBalance,
-        refreshStats,
-      }}
-    >
-      {children}
-    </GameContext.Provider>
-  );
+  return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 
 export function useGame() {
-  const context = useContext(GameContext);
-  if (context === undefined) {
-    throw new Error('useGame must be used within a GameProvider');
-  }
-  return context;
+  const ctx = useContext(GameContext);
+  if (!ctx) throw new Error("useGame must be used within a GameProvider");
+  return ctx;
 }
