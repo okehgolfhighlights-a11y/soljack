@@ -11,7 +11,7 @@ export default function OnlineIndicator() {
     <div className="sj-online-indicator" title={isLive ? "Live" : "Connecting…"}>
       <span className={dotClass} />
       <span className="sj-online-text">
-        {onlineCount} Online
+        {onlineCount}
       </span>
     </div>
   );

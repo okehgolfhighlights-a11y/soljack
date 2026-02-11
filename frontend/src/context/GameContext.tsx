@@ -20,6 +20,11 @@ interface GameContextValue {
   onlineCount: number;
   wsStatus: "connecting" | "open" | "closed" | "error";
 
+  // User state
+  username: string | null;
+  balance: number;
+  isAtTable: boolean;
+
   // Queue system
   joinQueue: (betTier: number, role: Role) => Promise<void>;
   leaveQueue: () => Promise<void>;
@@ -42,7 +47,7 @@ function deriveWsUrl(): string | null {
   if (typeof window === "undefined") return null;
 
   const proto = window.location.protocol === "https:" ? "wss" : "ws";
-  return '${proto}://${window.location.host}/ws';
+  return `${proto}://${window.location.host}/ws`;
 }
 
 /* =========================================================
@@ -54,6 +59,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     useState<GameContextValue["wsStatus"]>("connecting");
 
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+  
+  // User state (stub values - replace with real implementation)
+  const [username, setUsername] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number>(0);
+  const [isAtTable, setIsAtTable] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -162,13 +172,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     () => ({
       onlineCount,
       wsStatus,
+      username,
+      balance,
+      isAtTable,
       joinQueue,
       leaveQueue,
       queueStatus,
       createPrivateMatch,
       joinPrivateMatch,
     }),
-    [onlineCount, wsStatus, queueStatus]
+    [onlineCount, wsStatus, username, balance, isAtTable, queueStatus]
   );
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
