@@ -71,8 +71,15 @@ export default function PracticeTable() {
     resetGame();
   }, []);
 
-  const playerScore = useMemo(() => handValue(playerHand), [playerHand]);
-  const dealerScore = useMemo(() => handValue(dealerHand), [dealerHand]);
+  const playerScore = useMemo(
+    () => handValue(playerHand),
+    [playerHand]
+  );
+
+  const dealerScore = useMemo(
+    () => handValue(dealerHand),
+    [dealerHand]
+  );
 
   function drawCard(): Card {
     if (deck.length === 0) {
@@ -138,7 +145,7 @@ export default function PracticeTable() {
 
       {/* DEALER HAND */}
       <div className="sj-hand">
-        {dealerHand.map((c) => (
+        {dealerHand.map(c => (
           <div key={c.id} className="sj-card">
             <div className="sj-card-front">
               <div className="sj-card-corner">
@@ -159,7 +166,7 @@ export default function PracticeTable() {
 
       {/* PLAYER HAND */}
       <div className="sj-hand">
-        {playerHand.map((c) => (
+        {playerHand.map(c => (
           <div key={c.id} className="sj-card">
             <div className="sj-card-front">
               <div className="sj-card-corner">

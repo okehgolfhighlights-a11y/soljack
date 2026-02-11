@@ -120,3 +120,43 @@ code {
   letter-spacing: 0.04em;
   font-size: 12px;
 }
+
+/* ===============================
+   SCORE / MESSAGE STABILITY
+   =============================== */
+
+.sj-status {
+  min-height: 22px;
+  font-weight: 600;
+}
+
+.sj-score {
+  font-weight: 700;
+}
+
+/* ===============================
+   CONTROLS
+   =============================== */
+
+.sj-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sj-controls button {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ===============================
+   ANIMATION SAFETY
+   =============================== */
+
+.sj-hand,
+.sj-card {
+  will-change: transform;
+  transform-style: preserve-3d;
+}
