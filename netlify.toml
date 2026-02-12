@@ -1,6 +1,12 @@
 [build]
-  command = "cd frontend && yarn install && yarn build"
-  publish = "frontend/dist"
+  base = "frontend"
+  command = "yarn install && yarn build"
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
