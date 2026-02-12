@@ -9,8 +9,10 @@ interface Card {
   rank: Rank;
 }
 
-interface PracticeTableProps {
-  onExit: () => void;
+interface TournamentMatchProps {
+  player1: string;
+  player2: string;
+  onMatchEnd: (winner: string) => void;
 }
 
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
@@ -57,40 +59,21 @@ function isBlackjack(hand: Card[]): boolean {
   return hand.length === 2 && handValue(hand) === 21;
 }
 
-export default function PracticeTable({ onExit }: PracticeTableProps) {
+export default function TournamentMatch({ player1, player2, onMatchEnd }: TournamentMatchProps) {
   const [deck, setDeck] = useState<Card[]>(() => shuffle(buildDeck()));
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
   const [gamePhase, setGamePhase] = useState<"playing" | "finished">("playing");
   const [message, setMessage] = useState("");
-  const [bankroll, setBankroll] = useState(() => {
-    const saved = localStorage.getItem("practice_bankroll");
-    return saved ? parseFloat(saved) : 1.0;
-  });
   const [showDealerHole, setShowDealerHole] = useState(false);
-
-  useEffect(() => {
-    localStorage.setItem("practice_bankroll", bankroll.toFixed(2));
-  }, [bankroll]);
-
-  const drawCard = useCallback((): [Card, Card[]] => {
-    setDeck((currentDeck) => {
-      let newDeck = [...currentDeck];
-      if (newDeck.length === 0) {
-        newDeck = shuffle(buildDeck());
-      }
-      const card = newDeck[newDeck.length - 1];
-      return [card, newDeck.slice(0, -1)] as any;
-    });
-    return [null as any, []];
-  }, []);
+  const [playerWins, setPlayerWins] = useState(0);
+  const [opponentWins, setOpponentWins] = useState(0);
 
   const dealHand = useCallback(() => {
     let workingDeck = deck.length === 0 ? shuffle(buildDeck()) : [...deck];
     const draw = () => {
       if (workingDeck.length === 0) workingDeck = shuffle(buildDeck());
-      const card = workingDeck.pop()!;
-      return card;
+      return workingDeck.pop()!;
     };
 
     const p1 = draw();
@@ -113,15 +96,15 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
     if (pBJ || dBJ) {
       setShowDealerHole(true);
       if (pBJ && dBJ) {
-        setMessage("Push! Both Blackjack");
+        setMessage("Push! (doesn't count)");
         setGamePhase("finished");
       } else if (pBJ) {
-        setMessage("Blackjack! You win 0.075 SOL");
-        setBankroll((b) => parseFloat((b + 0.075).toFixed(2)));
+        setMessage("You win this hand!");
+        setPlayerWins((w) => w + 1);
         setGamePhase("finished");
       } else {
-        setMessage("Dealer Blackjack. You lose 0.05 SOL");
-        setBankroll((b) => parseFloat((b - 0.05).toFixed(2)));
+        setMessage("Opponent wins this hand");
+        setOpponentWins((w) => w + 1);
         setGamePhase("finished");
       }
     } else {
@@ -137,8 +120,8 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
         const newHand = [...h, card];
         const val = handValue(newHand);
         if (val > 21) {
-          setMessage("Bust! You lose 0.05 SOL");
-          setBankroll((b) => parseFloat((b - 0.05).toFixed(2)));
+          setMessage("Bust! Opponent wins this hand");
+          setOpponentWins((w) => w + 1);
           setGamePhase("finished");
           setShowDealerHole(true);
         }
@@ -163,16 +146,16 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
       const dVal = handValue(dealer);
 
       if (dVal > 21) {
-        setMessage("Dealer busts! You win 0.05 SOL");
-        setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
+        setMessage("Dealer busts! You win this hand");
+        setPlayerWins((w) => w + 1);
       } else if (pVal > dVal) {
-        setMessage("You win 0.05 SOL");
-        setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
+        setMessage("You win this hand!");
+        setPlayerWins((w) => w + 1);
       } else if (pVal < dVal) {
-        setMessage("You lose 0.05 SOL");
-        setBankroll((b) => parseFloat((b - 0.05).toFixed(2)));
+        setMessage("Opponent wins this hand");
+        setOpponentWins((w) => w + 1);
       } else {
-        setMessage("Push!");
+        setMessage("Push! (doesn't count)");
       }
       setGamePhase("finished");
       return workingDeck;
@@ -185,10 +168,16 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
 
   useEffect(() => {
     if (gamePhase === "finished") {
-      const timer = setTimeout(dealHand, 2000);
-      return () => clearTimeout(timer);
+      if (playerWins >= 4) {
+        setTimeout(() => onMatchEnd(player1), 2000);
+      } else if (opponentWins >= 4) {
+        setTimeout(() => onMatchEnd(player2), 2000);
+      } else {
+        const timer = setTimeout(dealHand, 2000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [gamePhase, dealHand]);
+  }, [gamePhase, playerWins, opponentWins, dealHand, onMatchEnd, player1, player2]);
 
   const pVal = handValue(playerHand);
   const dVal = handValue(dealerHand);
@@ -196,9 +185,16 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
   return (
     <div style={styles.container}>
       <div style={styles.table}>
-        <div style={styles.topBar}>
-          <div style={styles.bankroll}>Bankroll: {bankroll.toFixed(2)} SOL</div>
-          <button style={styles.lobbyBtn} onClick={onExit}>Lobby</button>
+        <div style={styles.scoreboard}>
+          <div style={styles.scoreItem}>
+            <div style={styles.scoreLabel}>YOU</div>
+            <div style={styles.scoreValue}>{playerWins}</div>
+          </div>
+          <div style={styles.scoreCenter}>First to 4 wins</div>
+          <div style={styles.scoreItem}>
+            <div style={styles.scoreLabel}>OPP</div>
+            <div style={styles.scoreValue}>{opponentWins}</div>
+          </div>
         </div>
 
         <div style={styles.dealerZone}>
@@ -277,11 +273,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     background: "linear-gradient(135deg, #1a5f3f 0%, #0d3d28 100%)",
-    padding: "20px",
+    padding: 20,
   },
   table: {
     width: "100%",
-    maxWidth: "900px",
+    maxWidth: 900,
     background: "#2d5016",
     borderRadius: "200px / 100px",
     padding: "60px 40px",
@@ -289,27 +285,32 @@ const styles: Record<string, React.CSSProperties> = {
     border: "12px solid #8b6914",
     position: "relative",
   },
-  topBar: {
+  scoreboard: {
     position: "absolute",
     top: 20,
     left: 40,
     right: 40,
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
   },
-  bankroll: {
-    color: "#ffd700",
-    fontSize: 18,
-    fontWeight: 600,
+  scoreItem: {
+    textAlign: "center",
   },
-  lobbyBtn: {
-    padding: "8px 20px",
-    background: "linear-gradient(135deg, #ff9800, #f57c00)",
-    border: "none",
-    borderRadius: 6,
-    color: "#fff",
+  scoreLabel: {
+    fontSize: 14,
+    color: "#999",
+    marginBottom: 4,
+  },
+  scoreValue: {
+    fontSize: 32,
     fontWeight: 700,
-    cursor: "pointer",
+    color: "#ffd700",
+  },
+  scoreCenter: {
+    fontSize: 16,
+    color: "#fff",
+    fontWeight: 600,
   },
   dealerZone: {
     marginBottom: 80,

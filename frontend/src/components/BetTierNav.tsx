@@ -9,39 +9,51 @@ const BET_TIERS = [
   { label: "1 SOL", value: 1.0 },
 ];
 
+const COLORS = ["#e57373", "#ef9a9a", "#f48fb1", "#ce93d8", "#90caf9", "#81d4fa"];
+
 interface Props {
   selectedTier: number | null;
   onSelectTier: (tier: number) => void;
   onPracticeMode: () => void;
+  onTournamentMode: () => void;
 }
 
 export default function BetTierNav({
   selectedTier,
   onSelectTier,
   onPracticeMode,
+  onTournamentMode,
 }: Props) {
   const { balance } = useGame();
 
   return (
     <nav style={styles.nav}>
-      {/* PRACTICE BUTTON */}
       <button
         style={{
           ...styles.practiceButton,
           background:
-            selectedTier === null
+            selectedTier === -1
               ? "linear-gradient(135deg, #4caf50 0%, #81c784 100%)"
-              : "#4caf50",
+              : "rgba(76, 175, 80, 0.2)",
         }}
         onClick={onPracticeMode}
       >
-        🎮 Practice
+        🤖 Practice
       </button>
 
-      {/* REAL BET TIERS */}
-      {BET_TIERS.map((tier) => {
+      <button
+        style={{
+          ...styles.tournamentButton,
+          background: "linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)",
+        }}
+        onClick={onTournamentMode}
+      >
+        🏆 Tournament 0.1 SOL
+      </button>
+
+      {BET_TIERS.map((tier, index) => {
         const isSelected = selectedTier === tier.value;
-        const canAfford = balance >= tier.value;
+        const canAfford = balance >= tier.value + 0.001;
 
         return (
           <button
@@ -49,13 +61,13 @@ export default function BetTierNav({
             style={{
               ...styles.tierButton,
               background: isSelected
-                ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                ? `linear-gradient(135deg, ${COLORS[index]} 0%, ${COLORS[index]}dd 100%)`
                 : canAfford
-                ? "white"
-                : "#eee",
+                ? "rgba(255, 255, 255, 0.5)"
+                : "rgba(200, 200, 200, 0.3)",
               opacity: canAfford ? 1 : 0.5,
               cursor: canAfford ? "pointer" : "not-allowed",
-              color: isSelected ? "white" : "#333",
+              transform: isSelected ? "scale(1.05)" : "scale(1)",
             }}
             onClick={() => canAfford && onSelectTier(tier.value)}
             disabled={!canAfford}
@@ -68,29 +80,40 @@ export default function BetTierNav({
   );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
+const styles: Record<string, React.CSSProperties> = {
   nav: {
     display: "flex",
     justifyContent: "center",
-    gap: "15px",
-    padding: "20px",
+    gap: 15,
+    padding: 20,
     flexWrap: "wrap",
   },
   practiceButton: {
     border: "none",
-    borderRadius: "12px",
+    borderRadius: 12,
     padding: "15px 25px",
-    fontSize: "16px",
+    fontSize: 16,
     fontWeight: 600,
-    color: "white",
+    transition: "all 0.3s ease",
     cursor: "pointer",
+    color: "white",
+  },
+  tournamentButton: {
+    border: "none",
+    borderRadius: 12,
+    padding: "15px 25px",
+    fontSize: 16,
+    fontWeight: 600,
+    transition: "all 0.3s ease",
+    cursor: "pointer",
+    color: "white",
   },
   tierButton: {
     border: "none",
-    borderRadius: "12px",
-    padding: "15px 25px",
-    fontSize: "16px",
+    borderRadius: 12,
+    padding: "15px 30px",
+    fontSize: 16,
     fontWeight: 600,
-    transition: "all 0.2s ease",
+    transition: "all 0.3s ease",
   },
 };
