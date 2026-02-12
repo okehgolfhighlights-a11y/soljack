@@ -1,6 +1,6 @@
 [build]
   base = "frontend"
-  command = "yarn install && yarn build"
+  command = "yarn build"
   publish = "dist"
 
 [build.environment]
