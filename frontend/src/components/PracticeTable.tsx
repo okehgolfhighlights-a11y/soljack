@@ -68,29 +68,33 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
     return saved ? parseFloat(saved) : 1.0;
   });
   const [showDealerHole, setShowDealerHole] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("practice_bankroll", bankroll.toFixed(2));
   }, [bankroll]);
 
-  const drawCard = useCallback((): [Card, Card[]] => {
-    setDeck((currentDeck) => {
-      let newDeck = [...currentDeck];
-      if (newDeck.length === 0) {
-        newDeck = shuffle(buildDeck());
-      }
-      const card = newDeck[newDeck.length - 1];
-      return [card, newDeck.slice(0, -1)] as any;
-    });
-    return [null as any, []];
+  const triggerShuffle = useCallback(() => {
+    setIsShuffling(true);
+    setTimeout(() => {
+      setIsShuffling(false);
+    }, 5000);
   }, []);
 
   const dealHand = useCallback(() => {
-    let workingDeck = deck.length === 0 ? shuffle(buildDeck()) : [...deck];
+    let workingDeck = [...deck];
+    
+    if (workingDeck.length < 4) {
+      triggerShuffle();
+      workingDeck = shuffle(buildDeck());
+    }
+
     const draw = () => {
-      if (workingDeck.length === 0) workingDeck = shuffle(buildDeck());
-      const card = workingDeck.pop()!;
-      return card;
+      if (workingDeck.length === 0) {
+        triggerShuffle();
+        workingDeck = shuffle(buildDeck());
+      }
+      return workingDeck.pop()!;
     };
 
     const p1 = draw();
@@ -127,11 +131,15 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
     } else {
       setGamePhase("playing");
     }
-  }, [deck]);
+  }, [deck, triggerShuffle]);
 
   const hit = useCallback(() => {
     setDeck((currentDeck) => {
-      let workingDeck = currentDeck.length === 0 ? shuffle(buildDeck()) : [...currentDeck];
+      let workingDeck = [...currentDeck];
+      if (workingDeck.length === 0) {
+        triggerShuffle();
+        workingDeck = shuffle(buildDeck());
+      }
       const card = workingDeck.pop()!;
       setPlayerHand((h) => {
         const newHand = [...h, card];
@@ -146,7 +154,7 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
       });
       return workingDeck;
     });
-  }, []);
+  }, [triggerShuffle]);
 
   const stand = useCallback(() => {
     setShowDealerHole(true);
@@ -154,7 +162,10 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
       let workingDeck = [...currentDeck];
       let dealer = [...dealerHand];
       while (handValue(dealer) < 17) {
-        if (workingDeck.length === 0) workingDeck = shuffle(buildDeck());
+        if (workingDeck.length === 0) {
+          triggerShuffle();
+          workingDeck = shuffle(buildDeck());
+        }
         dealer.push(workingDeck.pop()!);
       }
       setDealerHand(dealer);
@@ -177,35 +188,62 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
       setGamePhase("finished");
       return workingDeck;
     });
-  }, [dealerHand, playerHand]);
+  }, [dealerHand, playerHand, triggerShuffle]);
 
-  useEffect(() => {
-    if (playerHand.length === 0) dealHand();
+  const fullReset = useCallback(() => {
+    setPlayerHand([]);
+    setDealerHand([]);
+    setDeck(shuffle(buildDeck()));
+    setBankroll(1.0);
+    setMessage("");
+    setGamePhase("playing");
+    setIsShuffling(false);
+    setShowDealerHole(false);
+    localStorage.removeItem("practice_bankroll");
   }, []);
 
   useEffect(() => {
-    if (gamePhase === "finished") {
+    if (playerHand.length === 0 && !isShuffling) dealHand();
+  }, []);
+
+  useEffect(() => {
+    if (gamePhase === "finished" && !isShuffling) {
       const timer = setTimeout(dealHand, 2000);
       return () => clearTimeout(timer);
     }
-  }, [gamePhase, dealHand]);
+  }, [gamePhase, isShuffling, dealHand]);
 
   const pVal = handValue(playerHand);
   const dVal = handValue(dealerHand);
+  const canHit = gamePhase === "playing" && !isShuffling && pVal < 21;
 
   return (
     <div style={styles.container}>
+      {isShuffling && (
+        <div className="sj-shuffle-overlay">
+          <div className="sj-shuffle-popup">
+            <div className="sj-shuffle-icon">🔄</div>
+            <div className="sj-shuffle-text">Shuffling Deck...</div>
+            <div className="sj-shuffle-subtext">Please wait 5 seconds</div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.table}>
         <div style={styles.topBar}>
           <div style={styles.bankroll}>Bankroll: {bankroll.toFixed(2)} SOL</div>
-          <button style={styles.lobbyBtn} onClick={onExit}>Lobby</button>
+          <div style={styles.topRight}>
+            <div className="sj-deck-counter">Deck: {deck.length} cards</div>
+            <button style={styles.resetBtn} onClick={fullReset}>Reset</button>
+            <button style={styles.lobbyBtn} onClick={onExit}>Lobby</button>
+          </div>
         </div>
 
         <div style={styles.dealerZone}>
           <div style={styles.label}>Dealer</div>
-          <div style={styles.hand}>
+          <div className="sj-hand-row">
             {dealerHand.map((c, i) => (
-              <div key={c.id} style={{ ...styles.cardSlot, left: i * 45 }}>
+              <div key={c.id} className="sj-card-enter">
                 {i === 1 && !showDealerHole ? <CardBack /> : <PlayingCard card={c} />}
               </div>
             ))}
@@ -216,9 +254,9 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.playerZone}>
-          <div style={styles.hand}>
+          <div className="sj-hand-row">
             {playerHand.map((c, i) => (
-              <div key={c.id} style={{ ...styles.cardSlot, left: i * 45 }}>
+              <div key={c.id} className="sj-card-enter">
                 <PlayingCard card={c} />
               </div>
             ))}
@@ -229,16 +267,16 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
 
         <div style={styles.controls}>
           <button
-            style={gamePhase === "playing" ? styles.btnActive : styles.btnDisabled}
+            style={canHit ? styles.btnActive : styles.btnDisabled}
             onClick={hit}
-            disabled={gamePhase !== "playing"}
+            disabled={!canHit}
           >
             Hit
           </button>
           <button
-            style={gamePhase === "playing" ? styles.btnActive : styles.btnDisabled}
+            style={gamePhase === "playing" && !isShuffling ? styles.btnActive : styles.btnDisabled}
             onClick={stand}
-            disabled={gamePhase !== "playing"}
+            disabled={gamePhase !== "playing" || isShuffling}
           >
             Stand
           </button>
@@ -288,6 +326,9 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 20px 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.3)",
     border: "12px solid #8b6914",
     position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
   },
   topBar: {
     position: "absolute",
@@ -296,11 +337,28 @@ const styles: Record<string, React.CSSProperties> = {
     right: 40,
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
+  },
+  topRight: {
+    display: "flex",
+    gap: 12,
+    alignItems: "center",
   },
   bankroll: {
     color: "#ffd700",
     fontSize: 18,
     fontWeight: 600,
+  },
+  resetBtn: {
+    padding: "8px 16px",
+    background: "transparent",
+    border: "2px solid #f44336",
+    borderRadius: 6,
+    color: "#f44336",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s",
   },
   lobbyBtn: {
     padding: "8px 20px",
@@ -314,10 +372,12 @@ const styles: Record<string, React.CSSProperties> = {
   dealerZone: {
     marginBottom: 80,
     textAlign: "center",
+    width: "100%",
   },
   playerZone: {
     marginTop: 80,
     textAlign: "center",
+    width: "100%",
   },
   label: {
     color: "#ffd700",
@@ -326,16 +386,6 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
     letterSpacing: 2,
     marginBottom: 15,
-  },
-  hand: {
-    position: "relative",
-    height: 140,
-    display: "flex",
-    justifyContent: "center",
-    margin: "0 auto",
-  },
-  cardSlot: {
-    position: "absolute",
   },
   card: {
     width: 90,

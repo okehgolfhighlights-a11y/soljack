@@ -68,11 +68,28 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
   const [showDealerHole, setShowDealerHole] = useState(false);
   const [playerWins, setPlayerWins] = useState(0);
   const [opponentWins, setOpponentWins] = useState(0);
+  const [isShuffling, setIsShuffling] = useState(false);
+
+  const triggerShuffle = useCallback(() => {
+    setIsShuffling(true);
+    setTimeout(() => {
+      setIsShuffling(false);
+    }, 5000);
+  }, []);
 
   const dealHand = useCallback(() => {
-    let workingDeck = deck.length === 0 ? shuffle(buildDeck()) : [...deck];
+    let workingDeck = [...deck];
+    
+    if (workingDeck.length < 4) {
+      triggerShuffle();
+      workingDeck = shuffle(buildDeck());
+    }
+
     const draw = () => {
-      if (workingDeck.length === 0) workingDeck = shuffle(buildDeck());
+      if (workingDeck.length === 0) {
+        triggerShuffle();
+        workingDeck = shuffle(buildDeck());
+      }
       return workingDeck.pop()!;
     };
 
@@ -110,11 +127,15 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
     } else {
       setGamePhase("playing");
     }
-  }, [deck]);
+  }, [deck, triggerShuffle]);
 
   const hit = useCallback(() => {
     setDeck((currentDeck) => {
-      let workingDeck = currentDeck.length === 0 ? shuffle(buildDeck()) : [...currentDeck];
+      let workingDeck = [...currentDeck];
+      if (workingDeck.length === 0) {
+        triggerShuffle();
+        workingDeck = shuffle(buildDeck());
+      }
       const card = workingDeck.pop()!;
       setPlayerHand((h) => {
         const newHand = [...h, card];
@@ -129,7 +150,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
       });
       return workingDeck;
     });
-  }, []);
+  }, [triggerShuffle]);
 
   const stand = useCallback(() => {
     setShowDealerHole(true);
@@ -137,7 +158,10 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
       let workingDeck = [...currentDeck];
       let dealer = [...dealerHand];
       while (handValue(dealer) < 17) {
-        if (workingDeck.length === 0) workingDeck = shuffle(buildDeck());
+        if (workingDeck.length === 0) {
+          triggerShuffle();
+          workingDeck = shuffle(buildDeck());
+        }
         dealer.push(workingDeck.pop()!);
       }
       setDealerHand(dealer);
@@ -160,14 +184,14 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
       setGamePhase("finished");
       return workingDeck;
     });
-  }, [dealerHand, playerHand]);
+  }, [dealerHand, playerHand, triggerShuffle]);
 
   useEffect(() => {
-    if (playerHand.length === 0) dealHand();
+    if (playerHand.length === 0 && !isShuffling) dealHand();
   }, []);
 
   useEffect(() => {
-    if (gamePhase === "finished") {
+    if (gamePhase === "finished" && !isShuffling) {
       if (playerWins >= 4) {
         setTimeout(() => onMatchEnd(player1), 2000);
       } else if (opponentWins >= 4) {
@@ -177,13 +201,24 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         return () => clearTimeout(timer);
       }
     }
-  }, [gamePhase, playerWins, opponentWins, dealHand, onMatchEnd, player1, player2]);
+  }, [gamePhase, playerWins, opponentWins, isShuffling, dealHand, onMatchEnd, player1, player2]);
 
   const pVal = handValue(playerHand);
   const dVal = handValue(dealerHand);
+  const canHit = gamePhase === "playing" && !isShuffling && pVal < 21;
 
   return (
     <div style={styles.container}>
+      {isShuffling && (
+        <div className="sj-shuffle-overlay">
+          <div className="sj-shuffle-popup">
+            <div className="sj-shuffle-icon">🔄</div>
+            <div className="sj-shuffle-text">Shuffling Deck...</div>
+            <div className="sj-shuffle-subtext">Please wait 5 seconds</div>
+          </div>
+        </div>
+      )}
+
       <div style={styles.table}>
         <div style={styles.scoreboard}>
           <div style={styles.scoreItem}>
@@ -199,9 +234,9 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
 
         <div style={styles.dealerZone}>
           <div style={styles.label}>Dealer</div>
-          <div style={styles.hand}>
+          <div className="sj-hand-row">
             {dealerHand.map((c, i) => (
-              <div key={c.id} style={{ ...styles.cardSlot, left: i * 45 }}>
+              <div key={c.id} className="sj-card-enter">
                 {i === 1 && !showDealerHole ? <CardBack /> : <PlayingCard card={c} />}
               </div>
             ))}
@@ -212,9 +247,9 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.playerZone}>
-          <div style={styles.hand}>
+          <div className="sj-hand-row">
             {playerHand.map((c, i) => (
-              <div key={c.id} style={{ ...styles.cardSlot, left: i * 45 }}>
+              <div key={c.id} className="sj-card-enter">
                 <PlayingCard card={c} />
               </div>
             ))}
@@ -225,16 +260,16 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
 
         <div style={styles.controls}>
           <button
-            style={gamePhase === "playing" ? styles.btnActive : styles.btnDisabled}
+            style={canHit ? styles.btnActive : styles.btnDisabled}
             onClick={hit}
-            disabled={gamePhase !== "playing"}
+            disabled={!canHit}
           >
             Hit
           </button>
           <button
-            style={gamePhase === "playing" ? styles.btnActive : styles.btnDisabled}
+            style={gamePhase === "playing" && !isShuffling ? styles.btnActive : styles.btnDisabled}
             onClick={stand}
-            disabled={gamePhase !== "playing"}
+            disabled={gamePhase !== "playing" || isShuffling}
           >
             Stand
           </button>
@@ -284,6 +319,9 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 20px 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.3)",
     border: "12px solid #8b6914",
     position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
   },
   scoreboard: {
     position: "absolute",
@@ -315,10 +353,12 @@ const styles: Record<string, React.CSSProperties> = {
   dealerZone: {
     marginBottom: 80,
     textAlign: "center",
+    width: "100%",
   },
   playerZone: {
     marginTop: 80,
     textAlign: "center",
+    width: "100%",
   },
   label: {
     color: "#ffd700",
@@ -327,16 +367,6 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
     letterSpacing: 2,
     marginBottom: 15,
-  },
-  hand: {
-    position: "relative",
-    height: 140,
-    display: "flex",
-    justifyContent: "center",
-    margin: "0 auto",
-  },
-  cardSlot: {
-    position: "absolute",
   },
   card: {
     width: 90,
