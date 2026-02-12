@@ -44,9 +44,14 @@ export default function BetTierNav({
       <button
         style={{
           ...styles.tournamentButton,
-          background: "linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)",
+          background: balance >= 0.1
+            ? "linear-gradient(135deg, #9c27b0 0%, #ba68c8 100%)"
+            : "rgba(156, 39, 176, 0.3)",
+          opacity: balance >= 0.1 ? 1 : 0.5,
+          cursor: balance >= 0.1 ? "pointer" : "not-allowed",
         }}
         onClick={onTournamentMode}
+        disabled={balance < 0.1}
       >
         🏆 Tournament 0.1 SOL
       </button>

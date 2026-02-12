@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface TournamentLobbyProps {
   onStart: (players: string[]) => void;
@@ -6,36 +6,23 @@ interface TournamentLobbyProps {
 }
 
 export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProps) {
-  const [players, setPlayers] = useState<string[]>(["You"]);
-  const [filling, setFilling] = useState(true);
-
-  useEffect(() => {
-    if (filling) {
-      const interval = setInterval(() => {
-        setPlayers((p) => {
-          if (p.length >= 8) {
-            setFilling(false);
-            return p;
-          }
-          return [...p, `Player ${p.length + 1}`];
-        });
-      }, 800);
-      return () => clearInterval(interval);
-    }
-  }, [filling]);
-
-  useEffect(() => {
-    if (players.length === 8 && !filling) {
-      const timer = setTimeout(() => onStart(players), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [players, filling, onStart]);
+  const [players] = useState<string[]>(["You"]);
 
   return (
     <div style={styles.container}>
       <div style={styles.lobby}>
         <h2 style={styles.title}>Tournament Lobby</h2>
         <div style={styles.subtitle}>0.1 SOL Entry • Winner Takes All (0.8 SOL)</div>
+
+        <div style={styles.infoBox}>
+          <div style={styles.infoIcon}>⏳</div>
+          <div style={styles.infoTitle}>Real Players Only</div>
+          <div style={styles.infoText}>
+            Tournament will start when 8 players join the queue.
+            <br />
+            Payment (0.1 SOL) will be charged when lobby is full.
+          </div>
+        </div>
 
         <div style={styles.grid}>
           {Array.from({ length: 8 }).map((_, i) => (
@@ -52,12 +39,15 @@ export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProp
           ))}
         </div>
 
-        {filling && (
-          <div style={styles.status}>Finding players... ({players.length}/8)</div>
-        )}
-        {!filling && players.length === 8 && (
-          <div style={styles.status}>Tournament starting...</div>
-        )}
+        <div style={styles.status}>
+          Waiting for players to join... ({players.length}/8)
+        </div>
+
+        <div style={styles.notice}>
+          💡 Tournament queue system requires backend integration.
+          <br />
+          This is a frontend preview only.
+        </div>
 
         <button style={styles.exitBtn} onClick={onExit}>
           Exit Lobby
@@ -96,7 +86,30 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 18,
     color: "#fff",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 30,
+  },
+  infoBox: {
+    background: "rgba(255, 215, 0, 0.1)",
+    border: "2px solid rgba(255, 215, 0, 0.3)",
+    borderRadius: 12,
+    padding: 24,
+    marginBottom: 30,
+    textAlign: "center",
+  },
+  infoIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  infoTitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: "#ffd700",
+    marginBottom: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#fff",
+    lineHeight: 1.6,
   },
   grid: {
     display: "grid",
@@ -138,6 +151,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffd700",
     textAlign: "center",
     marginBottom: 20,
+  },
+  notice: {
+    fontSize: 13,
+    color: "#90caf9",
+    textAlign: "center",
+    marginBottom: 20,
+    padding: 12,
+    background: "rgba(144, 202, 249, 0.1)",
+    borderRadius: 8,
+    lineHeight: 1.6,
   },
   exitBtn: {
     width: "100%",
