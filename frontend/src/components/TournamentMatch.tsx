@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 type Suit = "♠" | "♥" | "♦" | "♣";
 type Rank = "A" | "K" | "Q" | "J" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2";
@@ -69,6 +69,9 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
   const [playerWins, setPlayerWins] = useState(0);
   const [opponentWins, setOpponentWins] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
+  
+  // Track which cards have been animated
+  const animatedCardsRef = useRef<Set<string>>(new Set());
 
   const triggerShuffle = useCallback(() => {
     setIsShuffling(true);
@@ -100,6 +103,9 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
 
     const player = [p1, p2];
     const dealer = [d1, d2];
+
+    // Clear animated cards tracking for new hand
+    animatedCardsRef.current.clear();
 
     setDeck(workingDeck);
     setPlayerHand(player);
@@ -207,6 +213,15 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
   const dVal = handValue(dealerHand);
   const canHit = gamePhase === "playing" && !isShuffling && pVal < 21;
 
+  // Helper to determine if card should animate
+  const shouldAnimate = (cardId: string) => {
+    if (animatedCardsRef.current.has(cardId)) {
+      return false;
+    }
+    animatedCardsRef.current.add(cardId);
+    return true;
+  };
+
   return (
     <div style={styles.container}>
       {isShuffling && (
@@ -236,7 +251,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
           <div style={styles.label}>Dealer</div>
           <div className="sj-hand-row">
             {dealerHand.map((c, i) => (
-              <div key={c.id} className="sj-card-enter">
+              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
                 {i === 1 && !showDealerHole ? <CardBack /> : <PlayingCard card={c} />}
               </div>
             ))}
@@ -249,7 +264,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         <div style={styles.playerZone}>
           <div className="sj-hand-row">
             {playerHand.map((c, i) => (
-              <div key={c.id} className="sj-card-enter">
+              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
                 <PlayingCard card={c} />
               </div>
             ))}

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 type Suit = "♠" | "♥" | "♦" | "♣";
 type Rank = "A" | "K" | "Q" | "J" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2";
@@ -69,6 +69,9 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
   });
   const [showDealerHole, setShowDealerHole] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
+  
+  // Track which cards have been animated
+  const animatedCardsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     localStorage.setItem("practice_bankroll", bankroll.toFixed(2));
@@ -104,6 +107,9 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
 
     const player = [p1, p2];
     const dealer = [d1, d2];
+
+    // Clear animated cards tracking for new hand
+    animatedCardsRef.current.clear();
 
     setDeck(workingDeck);
     setPlayerHand(player);
@@ -199,6 +205,7 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
     setGamePhase("playing");
     setIsShuffling(false);
     setShowDealerHole(false);
+    animatedCardsRef.current.clear();
     localStorage.removeItem("practice_bankroll");
   }, []);
 
@@ -216,6 +223,15 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
   const pVal = handValue(playerHand);
   const dVal = handValue(dealerHand);
   const canHit = gamePhase === "playing" && !isShuffling && pVal < 21;
+
+  // Helper to determine if card should animate
+  const shouldAnimate = (cardId: string) => {
+    if (animatedCardsRef.current.has(cardId)) {
+      return false;
+    }
+    animatedCardsRef.current.add(cardId);
+    return true;
+  };
 
   return (
     <div style={styles.container}>
@@ -243,7 +259,7 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
           <div style={styles.label}>Dealer</div>
           <div className="sj-hand-row">
             {dealerHand.map((c, i) => (
-              <div key={c.id} className="sj-card-enter">
+              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
                 {i === 1 && !showDealerHole ? <CardBack /> : <PlayingCard card={c} />}
               </div>
             ))}
@@ -256,7 +272,7 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
         <div style={styles.playerZone}>
           <div className="sj-hand-row">
             {playerHand.map((c, i) => (
-              <div key={c.id} className="sj-card-enter">
+              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
                 <PlayingCard card={c} />
               </div>
             ))}
