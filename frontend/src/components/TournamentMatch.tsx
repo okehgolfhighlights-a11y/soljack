@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 type Suit = "♠" | "♥" | "♦" | "♣";
 type Rank = "A" | "K" | "Q" | "J" | "10" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2";
@@ -62,16 +62,12 @@ function isBlackjack(hand: Card[]): boolean {
 export default function TournamentMatch({ player1, player2, onMatchEnd }: TournamentMatchProps) {
   const [deck, setDeck] = useState<Card[]>(() => shuffle(buildDeck()));
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
-  const [dealerHand, setDealerHand] = useState<Card[]>([]);
-  const [gamePhase, setGamePhase] = useState<"playing" | "finished">("playing");
+  const [opponentHand, setOpponentHand] = useState<Card[]>([]);
+  const [gamePhase, setGamePhase] = useState<"player_turn" | "opponent_turn" | "finished">("player_turn");
   const [message, setMessage] = useState("");
-  const [showDealerHole, setShowDealerHole] = useState(false);
   const [playerWins, setPlayerWins] = useState(0);
   const [opponentWins, setOpponentWins] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
-  
-  // Track which cards have been animated
-  const animatedCardsRef = useRef<Set<string>>(new Set());
 
   const triggerShuffle = useCallback(() => {
     setIsShuffling(true);
@@ -97,29 +93,24 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
     };
 
     const p1 = draw();
-    const d1 = draw();
+    const o1 = draw();
     const p2 = draw();
-    const d2 = draw();
+    const o2 = draw();
 
     const player = [p1, p2];
-    const dealer = [d1, d2];
-
-    // Clear animated cards tracking for new hand
-    animatedCardsRef.current.clear();
+    const opponent = [o1, o2];
 
     setDeck(workingDeck);
     setPlayerHand(player);
-    setDealerHand(dealer);
-    setShowDealerHole(false);
+    setOpponentHand(opponent);
     setMessage("");
 
     const pBJ = isBlackjack(player);
-    const dBJ = isBlackjack(dealer);
+    const oBJ = isBlackjack(opponent);
 
-    if (pBJ || dBJ) {
-      setShowDealerHole(true);
-      if (pBJ && dBJ) {
-        setMessage("Push! (doesn't count)");
+    if (pBJ || oBJ) {
+      if (pBJ && oBJ) {
+        setMessage("Push! Both Blackjack (doesn't count)");
         setGamePhase("finished");
       } else if (pBJ) {
         setMessage("You win this hand!");
@@ -131,11 +122,11 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         setGamePhase("finished");
       }
     } else {
-      setGamePhase("playing");
+      setGamePhase("player_turn");
     }
   }, [deck, triggerShuffle]);
 
-  const hit = useCallback(() => {
+  const playerHit = useCallback(() => {
     setDeck((currentDeck) => {
       let workingDeck = [...currentDeck];
       if (workingDeck.length === 0) {
@@ -150,7 +141,6 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
           setMessage("Bust! Opponent wins this hand");
           setOpponentWins((w) => w + 1);
           setGamePhase("finished");
-          setShowDealerHole(true);
         }
         return newHand;
       });
@@ -158,39 +148,48 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
     });
   }, [triggerShuffle]);
 
-  const stand = useCallback(() => {
-    setShowDealerHole(true);
+  const playerStand = useCallback(() => {
+    setGamePhase("opponent_turn");
+    setMessage("Opponent's turn");
+  }, []);
+
+  const opponentHit = useCallback(() => {
     setDeck((currentDeck) => {
       let workingDeck = [...currentDeck];
-      let dealer = [...dealerHand];
-      while (handValue(dealer) < 17) {
-        if (workingDeck.length === 0) {
-          triggerShuffle();
-          workingDeck = shuffle(buildDeck());
+      if (workingDeck.length === 0) {
+        triggerShuffle();
+        workingDeck = shuffle(buildDeck());
+      }
+      const card = workingDeck.pop()!;
+      setOpponentHand((h) => {
+        const newHand = [...h, card];
+        const val = handValue(newHand);
+        if (val > 21) {
+          setMessage("Opponent busts! You win this hand");
+          setPlayerWins((w) => w + 1);
+          setGamePhase("finished");
         }
-        dealer.push(workingDeck.pop()!);
-      }
-      setDealerHand(dealer);
-
-      const pVal = handValue(playerHand);
-      const dVal = handValue(dealer);
-
-      if (dVal > 21) {
-        setMessage("Dealer busts! You win this hand");
-        setPlayerWins((w) => w + 1);
-      } else if (pVal > dVal) {
-        setMessage("You win this hand!");
-        setPlayerWins((w) => w + 1);
-      } else if (pVal < dVal) {
-        setMessage("Opponent wins this hand");
-        setOpponentWins((w) => w + 1);
-      } else {
-        setMessage("Push! (doesn't count)");
-      }
-      setGamePhase("finished");
+        return newHand;
+      });
       return workingDeck;
     });
-  }, [dealerHand, playerHand, triggerShuffle]);
+  }, [triggerShuffle]);
+
+  const opponentStand = useCallback(() => {
+    const pVal = handValue(playerHand);
+    const oVal = handValue(opponentHand);
+
+    if (pVal > oVal) {
+      setMessage("You win this hand!");
+      setPlayerWins((w) => w + 1);
+    } else if (pVal < oVal) {
+      setMessage("Opponent wins this hand");
+      setOpponentWins((w) => w + 1);
+    } else {
+      setMessage("Push! (doesn't count)");
+    }
+    setGamePhase("finished");
+  }, [playerHand, opponentHand]);
 
   useEffect(() => {
     if (playerHand.length === 0 && !isShuffling) dealHand();
@@ -210,17 +209,9 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
   }, [gamePhase, playerWins, opponentWins, isShuffling, dealHand, onMatchEnd, player1, player2]);
 
   const pVal = handValue(playerHand);
-  const dVal = handValue(dealerHand);
-  const canHit = gamePhase === "playing" && !isShuffling && pVal < 21;
-
-  // Helper to determine if card should animate
-  const shouldAnimate = (cardId: string) => {
-    if (animatedCardsRef.current.has(cardId)) {
-      return false;
-    }
-    animatedCardsRef.current.add(cardId);
-    return true;
-  };
+  const oVal = handValue(opponentHand);
+  const canPlayerHit = gamePhase === "player_turn" && !isShuffling && pVal < 21;
+  const canOpponentHit = gamePhase === "opponent_turn" && !isShuffling && oVal < 21;
 
   return (
     <div style={styles.container}>
@@ -247,48 +238,69 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
           </div>
         </div>
 
-        <div style={styles.dealerZone}>
-          <div style={styles.label}>Dealer</div>
+        <div style={styles.opponentZone}>
+          <div style={styles.label}>Opponent ({player2})</div>
           <div className="sj-hand-row">
-            {dealerHand.map((c, i) => (
-              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
-                {i === 1 && !showDealerHole ? <CardBack /> : <PlayingCard card={c} />}
+            {opponentHand.map((c) => (
+              <div key={c.id} className="sj-card-enter">
+                <PlayingCard card={c} />
               </div>
             ))}
           </div>
-          <div style={styles.score}>{showDealerHole ? dVal : dealerHand.length > 0 ? "?" : ""}</div>
+          <div style={styles.score}>{oVal}</div>
         </div>
 
         {message && <div style={styles.message}>{message}</div>}
 
         <div style={styles.playerZone}>
           <div className="sj-hand-row">
-            {playerHand.map((c, i) => (
-              <div key={c.id} className={shouldAnimate(c.id) ? "sj-card-enter" : ""}>
+            {playerHand.map((c) => (
+              <div key={c.id} className="sj-card-enter">
                 <PlayingCard card={c} />
               </div>
             ))}
           </div>
           <div style={styles.score}>{pVal}</div>
-          <div style={styles.label}>Player</div>
+          <div style={styles.label}>You ({player1})</div>
         </div>
 
-        <div style={styles.controls}>
-          <button
-            style={canHit ? styles.btnActive : styles.btnDisabled}
-            onClick={hit}
-            disabled={!canHit}
-          >
-            Hit
-          </button>
-          <button
-            style={gamePhase === "playing" && !isShuffling ? styles.btnActive : styles.btnDisabled}
-            onClick={stand}
-            disabled={gamePhase !== "playing" || isShuffling}
-          >
-            Stand
-          </button>
-        </div>
+        {gamePhase === "player_turn" && (
+          <div style={styles.controls}>
+            <button
+              style={canPlayerHit ? styles.btnActive : styles.btnDisabled}
+              onClick={playerHit}
+              disabled={!canPlayerHit}
+            >
+              Hit
+            </button>
+            <button
+              style={!isShuffling ? styles.btnActive : styles.btnDisabled}
+              onClick={playerStand}
+              disabled={isShuffling}
+            >
+              Stand
+            </button>
+          </div>
+        )}
+
+        {gamePhase === "opponent_turn" && (
+          <div style={styles.controls}>
+            <button
+              style={canOpponentHit ? styles.btnActive : styles.btnDisabled}
+              onClick={opponentHit}
+              disabled={!canOpponentHit}
+            >
+              Opponent Hit
+            </button>
+            <button
+              style={!isShuffling ? styles.btnActive : styles.btnDisabled}
+              onClick={opponentStand}
+              disabled={isShuffling}
+            >
+              Opponent Stand
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -304,14 +316,6 @@ function PlayingCard({ card }: { card: Card }) {
         {card.suit}
       </div>
       <div style={{ ...styles.center, color: isRed ? "#d32f2f" : "#000" }}>{card.suit}</div>
-    </div>
-  );
-}
-
-function CardBack() {
-  return (
-    <div style={{ ...styles.card, background: "linear-gradient(135deg, #1976d2, #0d47a1)" }}>
-      <div style={styles.backPattern}>🂠</div>
     </div>
   );
 }
@@ -365,7 +369,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     fontWeight: 600,
   },
-  dealerZone: {
+  opponentZone: {
     marginBottom: 80,
     textAlign: "center",
     width: "100%",
@@ -406,15 +410,6 @@ const styles: Record<string, React.CSSProperties> = {
     left: "50%",
     transform: "translate(-50%, -50%)",
     fontSize: 48,
-  },
-  backPattern: {
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 64,
-    color: "rgba(255,255,255,0.3)",
   },
   score: {
     color: "#fff",
