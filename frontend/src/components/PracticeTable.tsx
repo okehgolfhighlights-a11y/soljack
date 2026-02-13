@@ -16,6 +16,12 @@ interface PracticeTableProps {
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
 const RANKS: Rank[] = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
 
+const MEME_ICONS = [
+  "/memes/meme3-trollface.png",
+  "/memes/meme5-unicorn.png",
+  "/memes/meme8-hippo.png",
+];
+
 function buildDeck(): Card[] {
   const deck: Card[] = [];
   let index = 0;
@@ -61,7 +67,7 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
   const [deck, setDeck] = useState<Card[]>(() => shuffle(buildDeck()));
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [dealerHand, setDealerHand] = useState<Card[]>([]);
-  const [gamePhase, setGamePhase] = useState<"playing" | "finished">("playing");
+  const [gamePhase, setGamePhase] = useState<"playing" | "dealer_drawing" | "finished">("playing");
   const [message, setMessage] = useState("");
   const [bankroll, setBankroll] = useState(() => {
     const saved = localStorage.getItem("practice_bankroll");
@@ -158,38 +164,53 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
 
   const stand = useCallback(() => {
     setShowDealerHole(true);
-    setDeck((currentDeck) => {
-      let workingDeck = [...currentDeck];
-      let dealer = [...dealerHand];
-      
-      // Dealer auto-stands at 17 in Practice mode
-      while (handValue(dealer) < 17) {
-        if (workingDeck.length === 0) {
-          triggerShuffle();
-          workingDeck = shuffle(buildDeck());
-        }
-        dealer.push(workingDeck.pop()!);
-      }
-      setDealerHand(dealer);
+    setGamePhase("dealer_drawing");
+    
+    // Dealer draws with realistic delays
+    const dealerDrawSequence = () => {
+      setDeck((currentDeck) => {
+        let workingDeck = [...currentDeck];
+        let dealer = [...dealerHand];
+        
+        const drawWithDelay = (index: number) => {
+          if (handValue(dealer) >= 17) {
+            // Dealer finished drawing
+            const pVal = handValue(playerHand);
+            const dVal = handValue(dealer);
 
-      const pVal = handValue(playerHand);
-      const dVal = handValue(dealer);
+            if (dVal > 21) {
+              setMessage("Dealer busts! You win 0.05 SOL");
+              setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
+            } else if (pVal > dVal) {
+              setMessage("You win 0.05 SOL");
+              setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
+            } else if (pVal < dVal) {
+              setMessage("You lose 0.05 SOL");
+              setBankroll((b) => parseFloat((b - 0.05).toFixed(2)));
+            } else {
+              setMessage("Push!");
+            }
+            setGamePhase("finished");
+            return;
+          }
 
-      if (dVal > 21) {
-        setMessage("Dealer busts! You win 0.05 SOL");
-        setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
-      } else if (pVal > dVal) {
-        setMessage("You win 0.05 SOL");
-        setBankroll((b) => parseFloat((b + 0.05).toFixed(2)));
-      } else if (pVal < dVal) {
-        setMessage("You lose 0.05 SOL");
-        setBankroll((b) => parseFloat((b - 0.05).toFixed(2)));
-      } else {
-        setMessage("Push!");
-      }
-      setGamePhase("finished");
-      return workingDeck;
-    });
+          setTimeout(() => {
+            if (workingDeck.length === 0) {
+              triggerShuffle();
+              workingDeck = shuffle(buildDeck());
+            }
+            dealer.push(workingDeck.pop()!);
+            setDealerHand([...dealer]);
+            drawWithDelay(index + 1);
+          }, 450); // 450ms delay between dealer draws
+        };
+
+        drawWithDelay(0);
+        return workingDeck;
+      });
+    };
+
+    dealerDrawSequence();
   }, [dealerHand, playerHand, triggerShuffle]);
 
   const fullReset = useCallback(() => {
@@ -232,6 +253,13 @@ export default function PracticeTable({ onExit }: PracticeTableProps) {
       )}
 
       <div style={styles.table}>
+        {/* Pump.fun Branding */}
+        <div className="sj-pumpfun-branding">
+          {MEME_ICONS.map((icon, i) => (
+            <img key={i} src={icon} alt="" className="sj-meme-icon" />
+          ))}
+        </div>
+
         <div style={styles.topBar}>
           <div style={styles.bankroll}>Bankroll: {bankroll.toFixed(2)} SOL</div>
           <div style={styles.topRight}>

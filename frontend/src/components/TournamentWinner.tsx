@@ -1,22 +1,37 @@
+import { useEffect, useState } from "react";
+
 interface TournamentWinnerProps {
   winner: string;
   onExit: () => void;
+  winnerAvatar?: string;
 }
 
-export default function TournamentWinner({ winner, onExit }: TournamentWinnerProps) {
-  const isYou = winner === "You";
+export default function TournamentWinner({ winner, onExit, winnerAvatar = "/memes/meme1-lasereyes.png" }: TournamentWinnerProps) {
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  useEffect(() => {
+    setShowConfetti(true);
+  }, []);
 
   return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
+    <div style={styles.container}>
+      {showConfetti && <Confetti />}
+      
+      <div style={styles.card}>
         <div style={styles.trophy}>🏆</div>
-        <h1 style={styles.title}>
-          {isYou ? "CHAMPION!" : "TOURNAMENT COMPLETE"}
-        </h1>
-        <div style={styles.winner}>{winner}</div>
-        <div style={styles.prize}>
-          {isYou ? "You won 0.8 SOL!" : `${winner} won 0.8 SOL`}
+        
+        <div style={styles.winnerSection}>
+          <img src={winnerAvatar} alt="" style={styles.avatar} />
+          <h1 style={styles.title}>{winner}</h1>
         </div>
+        
+        <div style={styles.subtitle}>Tournament Champion</div>
+        
+        <div style={styles.prize}>
+          <div style={styles.prizeLabel}>Prize Pool</div>
+          <div style={styles.prizeAmount}>0.8 SOL</div>
+        </div>
+
         <button style={styles.exitBtn} onClick={onExit}>
           Return to Lobby
         </button>
@@ -25,53 +40,102 @@ export default function TournamentWinner({ winner, onExit }: TournamentWinnerPro
   );
 }
 
+function Confetti() {
+  return (
+    <div style={styles.confettiContainer}>
+      {Array.from({ length: 30 }).map((_, i) => (
+        <div
+          key={i}
+          style={{
+            ...styles.confetti,
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            animationDuration: `${3 + Math.random() * 2}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 const styles: Record<string, React.CSSProperties> = {
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: "rgba(0, 0, 0, 0.9)",
+  container: {
+    minHeight: "100vh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 10000,
+    background: "linear-gradient(135deg, #1a5f3f 0%, #0d3d28 100%)",
+    padding: 20,
+    position: "relative",
+    overflow: "hidden",
   },
-  modal: {
+  card: {
     background: "linear-gradient(135deg, #2d5016 0%, #1a3a0f 100%)",
     borderRadius: 20,
     padding: 60,
-    textAlign: "center",
-    border: "4px solid #ffd700",
-    boxShadow: "0 0 60px rgba(255, 215, 0, 0.6)",
     maxWidth: 500,
+    width: "100%",
+    border: "4px solid #ffd700",
+    boxShadow: "0 0 60px rgba(255, 215, 0, 0.6), 0 20px 60px rgba(0,0,0,0.8)",
+    textAlign: "center",
+    position: "relative",
+    zIndex: 10,
   },
   trophy: {
-    fontSize: 120,
+    fontSize: 80,
     marginBottom: 20,
+    animation: "bounce 1s ease-in-out infinite",
+  },
+  winnerSection: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: "50%",
+    objectFit: "cover",
+    border: "4px solid #ffd700",
+    boxShadow: "0 0 30px rgba(255, 215, 0, 0.8)",
   },
   title: {
-    fontSize: 48,
+    fontSize: 42,
     fontWeight: 700,
     color: "#ffd700",
-    marginBottom: 20,
     textShadow: "0 0 20px rgba(255, 215, 0, 0.8)",
+    marginBottom: 0,
   },
-  winner: {
-    fontSize: 32,
-    fontWeight: 700,
+  subtitle: {
+    fontSize: 24,
     color: "#fff",
-    marginBottom: 20,
+    marginBottom: 30,
+    textTransform: "uppercase",
+    letterSpacing: 2,
   },
   prize: {
-    fontSize: 24,
-    color: "#4caf50",
-    fontWeight: 600,
-    marginBottom: 40,
+    background: "rgba(255, 215, 0, 0.1)",
+    border: "2px solid #ffd700",
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 30,
+  },
+  prizeLabel: {
+    fontSize: 16,
+    color: "#fff",
+    opacity: 0.8,
+    marginBottom: 8,
+  },
+  prizeAmount: {
+    fontSize: 36,
+    fontWeight: 700,
+    color: "#ffd700",
   },
   exitBtn: {
-    padding: "16px 40px",
+    width: "100%",
+    padding: 16,
     fontSize: 18,
     fontWeight: 700,
     background: "linear-gradient(135deg, #ff9800, #f57c00)",
@@ -80,5 +144,23 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     cursor: "pointer",
     textTransform: "uppercase",
+    transition: "all 0.2s ease",
+  },
+  confettiContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    pointerEvents: "none",
+    overflow: "hidden",
+  },
+  confetti: {
+    position: "absolute",
+    width: 10,
+    height: 10,
+    background: "#ffd700",
+    top: -10,
+    animation: "fall 5s linear infinite",
   },
 };

@@ -13,10 +13,19 @@ interface TournamentMatchProps {
   player1: string;
   player2: string;
   onMatchEnd: (winner: string) => void;
+  roundName?: string; // "Quarterfinal" | "Semifinal" | "Final"
+  player1Avatar?: string;
+  player2Avatar?: string;
 }
 
 const SUITS: Suit[] = ["♠", "♥", "♦", "♣"];
 const RANKS: Rank[] = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2"];
+
+const MEME_ICONS = [
+  "/memes/meme3-trollface.png",
+  "/memes/meme5-unicorn.png",
+  "/memes/meme8-hippo.png",
+];
 
 function buildDeck(): Card[] {
   const deck: Card[] = [];
@@ -59,7 +68,14 @@ function isBlackjack(hand: Card[]): boolean {
   return hand.length === 2 && handValue(hand) === 21;
 }
 
-export default function TournamentMatch({ player1, player2, onMatchEnd }: TournamentMatchProps) {
+export default function TournamentMatch({ 
+  player1, 
+  player2, 
+  onMatchEnd,
+  roundName = "Match",
+  player1Avatar = "/memes/meme1-lasereyes.png",
+  player2Avatar = "/memes/meme2-penguin.png"
+}: TournamentMatchProps) {
   const [deck, setDeck] = useState<Card[]>(() => shuffle(buildDeck()));
   const [playerHand, setPlayerHand] = useState<Card[]>([]);
   const [opponentHand, setOpponentHand] = useState<Card[]>([]);
@@ -68,6 +84,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
   const [playerWins, setPlayerWins] = useState(0);
   const [opponentWins, setOpponentWins] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [currentRound, setCurrentRound] = useState(1);
 
   const triggerShuffle = useCallback(() => {
     setIsShuffling(true);
@@ -115,10 +132,12 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
       } else if (pBJ) {
         setMessage("You win this hand!");
         setPlayerWins((w) => w + 1);
+        setCurrentRound((r) => r + 1);
         setGamePhase("finished");
       } else {
         setMessage("Opponent wins this hand");
         setOpponentWins((w) => w + 1);
+        setCurrentRound((r) => r + 1);
         setGamePhase("finished");
       }
     } else {
@@ -140,6 +159,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         if (val > 21) {
           setMessage("Bust! Opponent wins this hand");
           setOpponentWins((w) => w + 1);
+          setCurrentRound((r) => r + 1);
           setGamePhase("finished");
         }
         return newHand;
@@ -167,6 +187,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
         if (val > 21) {
           setMessage("Opponent busts! You win this hand");
           setPlayerWins((w) => w + 1);
+          setCurrentRound((r) => r + 1);
           setGamePhase("finished");
         }
         return newHand;
@@ -188,6 +209,7 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
     } else {
       setMessage("Push! (doesn't count)");
     }
+    setCurrentRound((r) => r + 1);
     setGamePhase("finished");
   }, [playerHand, opponentHand]);
 
@@ -226,20 +248,38 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
       )}
 
       <div style={styles.table}>
+        {/* Pump.fun Branding */}
+        <div className="sj-pumpfun-branding">
+          {MEME_ICONS.map((icon, i) => (
+            <img key={i} src={icon} alt="" className="sj-meme-icon" />
+          ))}
+        </div>
+
         <div style={styles.scoreboard}>
           <div style={styles.scoreItem}>
             <div style={styles.scoreLabel}>YOU</div>
             <div style={styles.scoreValue}>{playerWins}</div>
           </div>
-          <div style={styles.scoreCenter}>First to 4 wins</div>
+          <div style={styles.scoreCenter}>
+            <div style={styles.roundName}>{roundName}</div>
+            <div style={styles.roundCounter}>Round {currentRound} of 7</div>
+            <div style={styles.firstTo}>First to 4 wins</div>
+          </div>
           <div style={styles.scoreItem}>
             <div style={styles.scoreLabel}>OPP</div>
             <div style={styles.scoreValue}>{opponentWins}</div>
           </div>
         </div>
 
-        <div style={styles.opponentZone}>
-          <div style={styles.label}>Opponent ({player2})</div>
+        <div style={{
+          ...styles.opponentZone,
+          ...(gamePhase === "opponent_turn" ? { boxShadow: "0 0 20px rgba(255, 215, 0, 0.4)" } : {}),
+          ...(gamePhase === "player_turn" ? { opacity: 0.6 } : {}),
+        }}>
+          <div className="sj-player-info" style={styles.playerInfo}>
+            <img src={player2Avatar} alt="" className="sj-player-avatar" />
+            <div style={styles.label}>Opponent ({player2})</div>
+          </div>
           <div className="sj-hand-row">
             {opponentHand.map((c) => (
               <div key={c.id} className="sj-card-enter">
@@ -252,7 +292,11 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
 
         {message && <div style={styles.message}>{message}</div>}
 
-        <div style={styles.playerZone}>
+        <div style={{
+          ...styles.playerZone,
+          ...(gamePhase === "player_turn" ? { boxShadow: "0 0 20px rgba(255, 215, 0, 0.4)" } : {}),
+          ...(gamePhase === "opponent_turn" ? { opacity: 0.6 } : {}),
+        }}>
           <div className="sj-hand-row">
             {playerHand.map((c) => (
               <div key={c.id} className="sj-card-enter">
@@ -261,7 +305,10 @@ export default function TournamentMatch({ player1, player2, onMatchEnd }: Tourna
             ))}
           </div>
           <div style={styles.score}>{pVal}</div>
-          <div style={styles.label}>You ({player1})</div>
+          <div className="sj-player-info" style={styles.playerInfo}>
+            <img src={player1Avatar} alt="" className="sj-player-avatar" />
+            <div style={styles.label}>You ({player1})</div>
+          </div>
         </div>
 
         {gamePhase === "player_turn" && (
@@ -365,7 +412,22 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffd700",
   },
   scoreCenter: {
-    fontSize: 16,
+    textAlign: "center",
+  },
+  roundName: {
+    fontSize: 18,
+    color: "#ffd700",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  roundCounter: {
+    fontSize: 14,
+    color: "#90caf9",
+    marginBottom: 4,
+  },
+  firstTo: {
+    fontSize: 14,
     color: "#fff",
     fontWeight: 600,
   },
@@ -373,11 +435,24 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 80,
     textAlign: "center",
     width: "100%",
+    padding: 16,
+    borderRadius: 16,
+    transition: "all 0.3s ease",
   },
   playerZone: {
     marginTop: 80,
     textAlign: "center",
     width: "100%",
+    padding: 16,
+    borderRadius: 16,
+    transition: "all 0.3s ease",
+  },
+  playerInfo: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 12,
   },
   label: {
     color: "#ffd700",
@@ -385,7 +460,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     textTransform: "uppercase",
     letterSpacing: 2,
-    marginBottom: 15,
   },
   card: {
     width: 90,

@@ -1,12 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TournamentLobbyProps {
   onStart: (players: string[]) => void;
   onExit: () => void;
 }
 
+const PLAYER_AVATARS = [
+  "/memes/meme1-lasereyes.png",
+  "/memes/meme2-penguin.png",
+  "/memes/meme3-trollface.png",
+  "/memes/meme4-npc.png",
+  "/memes/meme5-unicorn.png",
+  "/memes/meme6-smoker.png",
+  "/memes/meme7-dolphin.png",
+  "/memes/meme8-hippo.png",
+];
+
 export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProps) {
-  const [players] = useState<string[]>(["You"]);
+  const [players, setPlayers] = useState<string[]>(["You"]);
+  const [filling, setFilling] = useState(true);
+
+  useEffect(() => {
+    if (filling) {
+      const interval = setInterval(() => {
+        setPlayers((p) => {
+          if (p.length >= 8) {
+            setFilling(false);
+            return p;
+          }
+          return [...p, `Player ${p.length + 1}`];
+        });
+      }, 800);
+      return () => clearInterval(interval);
+    }
+  }, [filling]);
+
+  useEffect(() => {
+    if (players.length === 8 && !filling) {
+      const timer = setTimeout(() => onStart(players), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [players, filling, onStart]);
 
   return (
     <div style={styles.container}>
@@ -14,22 +48,12 @@ export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProp
         <h2 style={styles.title}>Tournament Lobby</h2>
         <div style={styles.subtitle}>0.1 SOL Entry • Winner Takes All (0.8 SOL)</div>
 
-        <div style={styles.infoBox}>
-          <div style={styles.infoIcon}>⏳</div>
-          <div style={styles.infoTitle}>Real Players Only</div>
-          <div style={styles.infoText}>
-            Tournament will start when 8 players join the queue.
-            <br />
-            Payment (0.1 SOL) will be charged when lobby is full.
-          </div>
-        </div>
-
         <div style={styles.grid}>
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} style={players[i] ? styles.slotFilled : styles.slotEmpty}>
               {players[i] ? (
                 <>
-                  <div style={styles.playerIcon}>👤</div>
+                  <img src={PLAYER_AVATARS[i]} alt="" style={styles.avatar} />
                   <div style={styles.playerName}>{players[i]}</div>
                 </>
               ) : (
@@ -39,15 +63,12 @@ export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProp
           ))}
         </div>
 
-        <div style={styles.status}>
-          Waiting for players to join... ({players.length}/8)
-        </div>
-
-        <div style={styles.notice}>
-          💡 Tournament queue system requires backend integration.
-          <br />
-          This is a frontend preview only.
-        </div>
+        {filling && (
+          <div style={styles.status}>Finding players... ({players.length}/8)</div>
+        )}
+        {!filling && players.length === 8 && (
+          <div style={styles.status}>Tournament starting...</div>
+        )}
 
         <button style={styles.exitBtn} onClick={onExit}>
           Exit Lobby
@@ -86,30 +107,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 18,
     color: "#fff",
     textAlign: "center",
-    marginBottom: 30,
-  },
-  infoBox: {
-    background: "rgba(255, 215, 0, 0.1)",
-    border: "2px solid rgba(255, 215, 0, 0.3)",
-    borderRadius: 12,
-    padding: 24,
-    marginBottom: 30,
-    textAlign: "center",
-  },
-  infoIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 20,
-    fontWeight: 700,
-    color: "#ffd700",
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: "#fff",
-    lineHeight: 1.6,
+    marginBottom: 40,
   },
   grid: {
     display: "grid",
@@ -123,6 +121,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 20,
     textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
   },
   slotEmpty: {
     background: "rgba(255, 255, 255, 0.05)",
@@ -130,10 +132,17 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 20,
     textAlign: "center",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  playerIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    objectFit: "cover",
+    border: "2px solid #ffd700",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
   },
   playerName: {
     fontSize: 14,
@@ -143,7 +152,6 @@ const styles: Record<string, React.CSSProperties> = {
   waiting: {
     fontSize: 14,
     color: "#999",
-    padding: "20px 0",
   },
   status: {
     fontSize: 20,
@@ -151,16 +159,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#ffd700",
     textAlign: "center",
     marginBottom: 20,
-  },
-  notice: {
-    fontSize: 13,
-    color: "#90caf9",
-    textAlign: "center",
-    marginBottom: 20,
-    padding: 12,
-    background: "rgba(144, 202, 249, 0.1)",
-    borderRadius: 8,
-    lineHeight: 1.6,
   },
   exitBtn: {
     width: "100%",

@@ -62,47 +62,55 @@ code {
 }
 
 /* ===============================
-   CARD SLIDE-IN ANIMATION
+   PREMIUM CARD SLIDE-IN ANIMATION
    =============================== */
 
 @keyframes dealCard {
-  from {
-    transform: translateY(-80px) scale(0.8);
+  0% {
+    transform: translateY(-100px) scale(0.85);
     opacity: 0;
   }
-  to {
+  60% {
+    transform: translateY(5px) scale(1.02);
+    opacity: 1;
+  }
+  100% {
     transform: translateY(0px) scale(1);
     opacity: 1;
   }
 }
 
 .sj-card-enter {
-  animation: dealCard 0.5s ease-out forwards;
+  animation: dealCard 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-/* Stagger animation for multiple cards */
+/* Stagger animation for multiple cards - refined timing */
 .sj-card-enter:nth-child(1) {
   animation-delay: 0ms;
 }
 
 .sj-card-enter:nth-child(2) {
-  animation-delay: 150ms;
+  animation-delay: 200ms;
 }
 
 .sj-card-enter:nth-child(3) {
-  animation-delay: 300ms;
+  animation-delay: 400ms;
 }
 
 .sj-card-enter:nth-child(4) {
-  animation-delay: 450ms;
-}
-
-.sj-card-enter:nth-child(5) {
   animation-delay: 600ms;
 }
 
+.sj-card-enter:nth-child(5) {
+  animation-delay: 800ms;
+}
+
 .sj-card-enter:nth-child(6) {
-  animation-delay: 750ms;
+  animation-delay: 1000ms;
+}
+
+.sj-card-enter:nth-child(7) {
+  animation-delay: 1200ms;
 }
 
 /* ===============================
@@ -118,7 +126,7 @@ code {
   background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
-  justifyContent: center;
+  justify-content: center;
   z-index: 9999;
   backdrop-filter: blur(4px);
 }
@@ -162,6 +170,59 @@ code {
 }
 
 /* ===============================
+   PUMP.FUN FLOATING BRANDING
+   =============================== */
+
+.sj-pumpfun-branding {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sj-meme-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes floaty {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.sj-meme-icon:nth-child(1) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.sj-meme-icon:nth-child(2) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+.sj-meme-icon:nth-child(3) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* ===============================
    CENTERED HAND LAYOUT
    =============================== */
 
@@ -169,9 +230,10 @@ code {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
   margin-top: 12px;
+  min-height: 140px;
 }
 
 .sj-table-area {
@@ -183,10 +245,9 @@ code {
 }
 
 /* ===============================
-   SOLJACK CARD LAYOUT
+   CARD LAYOUT
    =============================== */
 
-/* Hand container — forces side-by-side cards */
 .sj-hand {
   display: flex;
   justify-content: center;
@@ -196,7 +257,6 @@ code {
   width: 100%;
 }
 
-/* Individual card */
 .sj-card {
   width: 72px;
   height: 100px;
@@ -204,7 +264,6 @@ code {
   flex-shrink: 0;
 }
 
-/* Card faces */
 .sj-card-front,
 .sj-card-back {
   position: absolute;
@@ -248,6 +307,20 @@ code {
 }
 
 /* ===============================
+   TURN INDICATOR GLOW
+   =============================== */
+
+.sj-active-turn {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.sj-inactive-turn {
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+/* ===============================
    SCORE / MESSAGE STABILITY
    =============================== */
 
@@ -266,16 +339,22 @@ code {
 
 .sj-controls {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
 .sj-controls button {
-  padding: 10px 16px;
+  padding: 12px 24px;
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sj-controls button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* ===============================
@@ -290,6 +369,25 @@ code {
 }
 
 /* ===============================
+   TOURNAMENT PLAYER AVATAR
+   =============================== */
+
+.sj-player-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffd700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sj-player-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===============================
    ANIMATION SAFETY
    =============================== */
 
@@ -299,18 +397,40 @@ code {
   transform-style: preserve-3d;
 }
 
-.sj-online {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 14px;
-}
-
 .sj-online-dot {
   width: 8px;
   height: 8px;
   background: #22c55e;
   border-radius: 50%;
   box-shadow: 0 0 8px #22c55e;
+}
+
+/* ===============================
+   BUST & BLACKJACK EFFECTS
+   =============================== */
+
+@keyframes bustPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(244, 67, 54, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6);
+  }
+}
+
+.sj-bust-effect {
+  animation: bustPulse 1s ease-out;
+}
+
+@keyframes blackjackFlash {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+  }
+}
+
+.sj-blackjack-effect {
+  animation: blackjackFlash 0.8s ease-out;
 }
