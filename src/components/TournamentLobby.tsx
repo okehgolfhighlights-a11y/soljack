@@ -1,0 +1,174 @@
+import { useState, useEffect } from "react";
+
+interface TournamentLobbyProps {
+  onStart: (players: string[]) => void;
+  onExit: () => void;
+}
+
+const PLAYER_AVATARS = [
+  "/memes/meme1-lasereyes.png",
+  "/memes/meme2-penguin.png",
+  "/memes/meme3-trollface.png",
+  "/memes/meme4-npc.png",
+  "/memes/meme5-unicorn.png",
+  "/memes/meme6-smoker.png",
+  "/memes/meme7-dolphin.png",
+  "/memes/meme8-hippo.png",
+];
+
+export default function TournamentLobby({ onStart, onExit }: TournamentLobbyProps) {
+  const [players, setPlayers] = useState<string[]>(["You"]);
+  const [filling, setFilling] = useState(true);
+
+  useEffect(() => {
+    if (filling) {
+      const interval = setInterval(() => {
+        setPlayers((p) => {
+          if (p.length >= 8) {
+            setFilling(false);
+            return p;
+          }
+          return [...p, `Player ${p.length + 1}`];
+        });
+      }, 800);
+      return () => clearInterval(interval);
+    }
+  }, [filling]);
+
+  useEffect(() => {
+    if (players.length === 8 && !filling) {
+      const timer = setTimeout(() => onStart(players), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [players, filling, onStart]);
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.lobby}>
+        <h2 style={styles.title}>Tournament Lobby</h2>
+        <div style={styles.subtitle}>0.1 SOL Entry • Winner Takes All (0.8 SOL)</div>
+
+        <div style={styles.grid}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={players[i] ? styles.slotFilled : styles.slotEmpty}>
+              {players[i] ? (
+                <>
+                  <img src={PLAYER_AVATARS[i]} alt="" style={styles.avatar} />
+                  <div style={styles.playerName}>{players[i]}</div>
+                </>
+              ) : (
+                <div style={styles.waiting}>Waiting...</div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {filling && (
+          <div style={styles.status}>Finding players... ({players.length}/8)</div>
+        )}
+        {!filling && players.length === 8 && (
+          <div style={styles.status}>Tournament starting...</div>
+        )}
+
+        <button style={styles.exitBtn} onClick={onExit}>
+          Exit Lobby
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "linear-gradient(135deg, #1a5f3f 0%, #0d3d28 100%)",
+    padding: 20,
+  },
+  lobby: {
+    background: "linear-gradient(135deg, #2d5016 0%, #1a3a0f 100%)",
+    borderRadius: 20,
+    padding: 50,
+    maxWidth: 700,
+    width: "100%",
+    border: "4px solid #ffd700",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+  },
+  title: {
+    fontSize: 36,
+    fontWeight: 700,
+    color: "#ffd700",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 40,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: 16,
+    marginBottom: 30,
+  },
+  slotFilled: {
+    background: "rgba(76, 175, 80, 0.2)",
+    border: "2px solid #4caf50",
+    borderRadius: 12,
+    padding: 20,
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+  },
+  slotEmpty: {
+    background: "rgba(255, 255, 255, 0.05)",
+    border: "2px dashed rgba(255, 255, 255, 0.3)",
+    borderRadius: 12,
+    padding: 20,
+    textAlign: "center",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: "50%",
+    objectFit: "cover",
+    border: "2px solid #ffd700",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+  },
+  playerName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#fff",
+  },
+  waiting: {
+    fontSize: 14,
+    color: "#999",
+  },
+  status: {
+    fontSize: 20,
+    fontWeight: 600,
+    color: "#ffd700",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  exitBtn: {
+    width: "100%",
+    padding: 16,
+    fontSize: 16,
+    fontWeight: 700,
+    background: "rgba(139, 105, 20, 0.8)",
+    border: "2px solid #ffd700",
+    borderRadius: 8,
+    color: "#fff",
+    cursor: "pointer",
+  },
+};

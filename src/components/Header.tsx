@@ -5,6 +5,8 @@ import { useGame } from '../context/GameContext';
 import UsernameModal from './UsernameModal';
 import ProfileModal from './ProfileModal';
 import LeaderboardDropdown from './LeaderboardDropdown';
+import OnlineIndicator from "./OnlineIndicator";
+import { useOnlineCount } from "../hooks/useOnlineCount";
 
 export default function Header() {
   const { connected } = useWallet();
@@ -13,6 +15,7 @@ export default function Header() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const online = useOnlineCount();
 
   return (
     <>
@@ -33,7 +36,14 @@ export default function Header() {
           </button>
           {showLeaderboard && <LeaderboardDropdown onClose={() => setShowLeaderboard(false)} />}
         </div>
-
+        <div className="right-side">
+          <OnlineIndicator />
+          {/* leaderboard button */}
+        </div>
+        <div className="sj-online">
+          <span className="sj-online-dot" />
+          <span>{online}</span>
+        </div>
         <div style={styles.rightSection}>
           {connected && (
             <div style={styles.balanceDisplay}>

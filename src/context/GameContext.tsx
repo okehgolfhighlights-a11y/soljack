@@ -1,163 +1,198 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-interface GameContextType {
-  username: string | null;
-  balance: number;
-  stats: {
-    wins: number;
-    losses: number;
-    totalHands: number;
-    rank: number | null;
-  };
-  currentTableId: string | null;
-  isAtTable: boolean;
-  setCurrentTableId: (id: string | null) => void;
-  refreshBalance: () => void;
-  refreshStats: () => void;
+type Role = "dealer" | "player";
+
+interface QueueStatus {
+  inQueue: boolean;
+  betTier: number;
+  role: Role | null;
 }
 
-const GameContext = createContext<GameContextType | undefined>(undefined);
+interface GameContextValue {
+  // Online indicator
+  onlineCount: number;
+  wsStatus: "connecting" | "open" | "closed" | "error";
 
-export function GameProvider({ children }: { children: ReactNode }) {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
+  // User state
+  username: string | null;
+  balance: number;
+  isAtTable: boolean;
+
+  // Queue system
+  joinQueue: (betTier: number, role: Role) => Promise<void>;
+  leaveQueue: () => Promise<void>;
+  queueStatus: QueueStatus | null;
+
+  // Private matches
+  createPrivateMatch: (betTier: number, role: Role) => Promise<string>;
+  joinPrivateMatch: (code: string, role: Role) => Promise<void>;
+}
+
+const GameContext = createContext<GameContextValue | null>(null);
+
+/* =========================================================
+   WEBSOCKET URL
+========================================================= */
+function deriveWsUrl(): string | null {
+  const envUrl = (import.meta as any).env?.VITE_WS_URL as string | undefined;
+  if (envUrl && envUrl.trim()) return envUrl.trim();
+
+  if (typeof window === "undefined") return null;
+
+  const proto = window.location.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${window.location.host}/ws`;
+}
+
+/* =========================================================
+   PROVIDER
+========================================================= */
+export function GameProvider({ children }: { children: React.ReactNode }) {
+  const [onlineCount, setOnlineCount] = useState<number>(0);
+  const [wsStatus, setWsStatus] =
+    useState<GameContextValue["wsStatus"]>("connecting");
+
+  const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+  
+  // User state (stub values - replace with real implementation)
   const [username, setUsername] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
-  const [stats, setStats] = useState({
-    wins: 0,
-    losses: 0,
-    totalHands: 0,
-    rank: null as number | null,
-  });
-  const [currentTableId, setCurrentTableId] = useState<string | null>(null);
-  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [isAtTable, setIsAtTable] = useState<boolean>(false);
 
-  const refreshBalance = async () => {
-    if (!publicKey) return;
-    try {
-      const bal = await connection.getBalance(publicKey);
-      setBalance(bal / 1e9); // Convert lamports to SOL
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-    }
-  };
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
 
-  const refreshStats = async () => {
-    if (!publicKey) return;
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiUrl}/player/${publicKey.toString()}/stats`);
-      if (!response.ok) {
-        console.warn('Failed to fetch stats from backend, using defaults');
-        return;
-      }
-      const data = await response.json();
-      setStats({
-        wins: data.wins || 0,
-        losses: data.losses || 0,
-        totalHands: data.totalHands || 0,
-        rank: data.rank || null,
-      });
-      setUsername(data.username || null);
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      // Keep default values on error
-    }
-  };
-
+  /* =========================================================
+     WEBSOCKET CONNECT
+  ========================================================= */
   useEffect(() => {
-    refreshBalance();
-    refreshStats();
-  }, [publicKey]);
+    const wsUrl = deriveWsUrl();
+    if (!wsUrl) return;
 
-  // WebSocket connection
-  useEffect(() => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-    let websocket: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout;
+    let alive = true;
 
     const connect = () => {
+      if (!alive) return;
+
       try {
-        websocket = new WebSocket(wsUrl);
+        setWsStatus("connecting");
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-        websocket.onopen = () => {
-          console.log('✅ WebSocket connected');
-          setWs(websocket);
-
-          // Subscribe to current table if any
-          if (currentTableId) {
-            websocket?.send(JSON.stringify({ event: 'subscribe', tableId: currentTableId }));
-          }
+        ws.onopen = () => {
+          if (!alive) return;
+          setWsStatus("open");
         };
 
-        websocket.onmessage = (event) => {
+        ws.onmessage = (ev) => {
           try {
-            const data = JSON.parse(event.data);
-            console.log('WebSocket message:', data);
-            // Handle events here (to be expanded)
-            // Events: table_created, player_joined, card_dealt, etc.
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            const data = JSON.parse(ev.data);
+            if (data.type === "online_count") {
+              setOnlineCount(data.count);
+            }
+          } catch {
+            // ignore bad packets
           }
         };
 
-        websocket.onerror = (error) => {
-          console.error('WebSocket error:', error);
+        ws.onerror = () => {
+          if (!alive) return;
+          setWsStatus("error");
         };
 
-        websocket.onclose = () => {
-          console.log('⚠️ WebSocket disconnected, reconnecting in 5s...');
-          setWs(null);
-          reconnectTimeout = setTimeout(connect, 5000);
+        ws.onclose = () => {
+          if (!alive) return;
+          setWsStatus("closed");
+
+          reconnectTimerRef.current = window.setTimeout(() => {
+            connect();
+          }, 1500);
         };
-      } catch (error) {
-        console.error('Failed to connect WebSocket:', error);
-        reconnectTimeout = setTimeout(connect, 5000);
+      } catch {
+        setWsStatus("error");
       }
     };
 
     connect();
 
     return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      if (websocket) {
-        websocket.close();
-      }
+      alive = false;
+      if (reconnectTimerRef.current)
+        window.clearTimeout(reconnectTimerRef.current);
+      wsRef.current?.close();
     };
   }, []);
 
-  // Subscribe/unsubscribe to table when currentTableId changes
-  useEffect(() => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  /* =========================================================
+     QUEUE SYSTEM (SIMULATED SAFE VERSION)
+  ========================================================= */
+  async function joinQueue(betTier: number, role: Role) {
+    setQueueStatus({
+      inQueue: true,
+      betTier,
+      role,
+    });
+  }
 
-    if (currentTableId) {
-      ws.send(JSON.stringify({ event: 'subscribe', tableId: currentTableId }));
-    }
-  }, [currentTableId, ws]);
+  async function leaveQueue() {
+    setQueueStatus(null);
+  }
 
-  return (
-    <GameContext.Provider
-      value={{
-        username,
-        balance,
-        stats,
-        currentTableId,
-        isAtTable: currentTableId !== null,
-        setCurrentTableId,
-        refreshBalance,
-        refreshStats,
-      }}
-    >
-      {children}
-    </GameContext.Provider>
+  /* =========================================================
+     PRIVATE MATCH SYSTEM (SAFE STUB VERSION)
+  ========================================================= */
+  async function createPrivateMatch(
+    betTier: number,
+    role: Role
+  ): Promise<string> {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setQueueStatus({
+      inQueue: true,
+      betTier,
+      role,
+    });
+    return code;
+  }
+
+  async function joinPrivateMatch(code: string, role: Role) {
+    setQueueStatus({
+      inQueue: true,
+      betTier: 1,
+      role,
+    });
+  }
+
+  const value = useMemo(
+    () => ({
+      onlineCount,
+      wsStatus,
+      username,
+      balance,
+      isAtTable,
+      joinQueue,
+      leaveQueue,
+      queueStatus,
+      createPrivateMatch,
+      joinPrivateMatch,
+    }),
+    [onlineCount, wsStatus, username, balance, isAtTable, queueStatus]
   );
+
+  return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
 }
 
+/* =========================================================
+   HOOK
+========================================================= */
 export function useGame() {
-  const context = useContext(GameContext);
-  if (context === undefined) {
-    throw new Error('useGame must be used within a GameProvider');
-  }
-  return context;
+  const ctx = useContext(GameContext);
+  if (!ctx)
+    throw new Error("useGame must be used within a GameProvider");
+  return ctx;
 }
