@@ -446,3 +446,13 @@ code {
 .sj-blackjack-effect {
   animation: blackjackFlash 0.8s ease-out;
 }
+
+/* Spinner animation for Lobby queue */
+@keyframes spin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}

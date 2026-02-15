@@ -1,0 +1,40 @@
+/* ✨ FEATURE GRID */
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-6);
+}
+
+.feature-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  border: 2px solid transparent;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--ocean-blue);
+}
+
+.feature-card__icon {
+  font-size: 48px;
+  margin-bottom: var(--space-4);
+}
+
+.feature-card__title {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  color: var(--navy-deep);
+  margin: 0 0 var(--space-3);
+}
+
+.feature-card__description {
+  color: var(--slate-gray);
+  line-height: 1.6;
+  margin: 0;
+}

@@ -4,6 +4,7 @@ import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { clusterApiUrl } from "@solana/web3.js";
+import { AudioProvider } from './components/audio/AudioManager';
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -33,9 +34,11 @@ function App() {
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          <GameProvider>
-            {page === "devwatch" ? <DevWatch /> : <HomePage />}
-          </GameProvider>
+          <AudioProvider>
+            <GameProvider>
+              {page === "devwatch" ? <DevWatch /> : <HomePage />}
+            </GameProvider>
+          </AudioProvider>
         </WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

@@ -1,0 +1,68 @@
+/* 🏆 RECENT WINNERS TICKER */
+
+.recent-winners {
+  overflow: hidden;
+  padding: var(--space-8) 0;
+}
+
+.winners-ticker {
+  display: flex;
+  gap: var(--space-6);
+  animation: scroll 20s linear infinite;
+}
+
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.winner-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.winner-card__icon {
+  font-size: 32px;
+}
+
+.winner-card__info {
+  flex: 1;
+}
+
+.winner-card__wallet {
+  color: white;
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-1);
+}
+
+.winner-card__details {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.winner-card__amount {
+  color: var(--limoncello-yellow);
+  font-weight: var(--font-bold);
+}
+
+.winner-card__type {
+  color: var(--mist-gray);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .winners-ticker {
+    animation: none;
+  }
+}

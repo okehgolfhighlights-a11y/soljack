@@ -1,0 +1,192 @@
+/* 🎴 SolJack Card Component */
+
+.sj-card {
+  width: 90px;
+  height: 126px; /* 5:7 ratio */
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+  transition: transform 0.2s ease;
+  cursor: default;
+  user-select: none;
+}
+
+.sj-card--clickable {
+  cursor: pointer;
+}
+
+.sj-card--clickable:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== CARD FACE ===== */
+
+.sj-card__face {
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.sj-card__corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.sj-card__corner--bottom {
+  transform: rotate(180deg);
+}
+
+.sj-card__rank {
+  font-size: 18px;
+  font-weight: bold;
+  font-family: Arial, sans-serif;
+}
+
+.sj-card__suit {
+  font-size: 16px;
+}
+
+.sj-card__center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.sj-card__suit--large {
+  font-size: 48px;
+}
+
+/* Card colors */
+.sj-card--red .sj-card__rank,
+.sj-card--red .sj-card__suit {
+  color: #D32F2F; /* Red for hearts/diamonds */
+}
+
+.sj-card--black .sj-card__rank,
+.sj-card--black .sj-card__suit {
+  color: #212121; /* Black for clubs/spades */
+}
+
+/* ===== CARD BACK ===== */
+
+.sj-card__back {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sj-card__back-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* ===== ANIMATIONS ===== */
+
+/* Card deal animation - NO FLASH VERSION */
+@keyframes dealCard {
+  0% {
+    transform: translateY(-120px) scale(0.8);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(8px) scale(1.03);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+  }
+}
+
+.sj-card-enter {
+  opacity: 0; /* Start invisible to prevent flash */
+  animation: dealCard 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Stagger delays for multiple cards */
+.sj-card-enter:nth-child(1) { animation-delay: 0ms; }
+.sj-card-enter:nth-child(2) { animation-delay: 350ms; }
+.sj-card-enter:nth-child(3) { animation-delay: 700ms; }
+.sj-card-enter:nth-child(4) { animation-delay: 1050ms; }
+.sj-card-enter:nth-child(5) { animation-delay: 1400ms; }
+
+/* Flip animation (if implementing flip from face-down to face-up) */
+@keyframes cardFlip {
+  0% {
+    transform: rotateY(0deg);
+  }
+  50% {
+    transform: rotateY(90deg);
+  }
+  100% {
+    transform: rotateY(0deg);
+  }
+}
+
+.sj-card--flipping {
+  animation: cardFlip 0.6s ease-in-out;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 768px) {
+  .sj-card {
+    width: 70px;
+    height: 98px;
+  }
+  
+  .sj-card__rank {
+    font-size: 14px;
+  }
+  
+  .sj-card__suit {
+    font-size: 12px;
+  }
+  
+  .sj-card__suit--large {
+    font-size: 36px;
+  }
+}
+
+/* ===== CARD STATES ===== */
+
+.sj-card--highlighted {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  transform: translateY(-8px) scale(1.05);
+}
+
+.sj-card--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+.sj-card:focus-visible {
+  outline: 2px solid var(--ocean-blue, #0077BE);
+  outline-offset: 2px;
+}
+
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .sj-card-enter {
+    animation: none;
+    opacity: 1;
+  }
+  
+  .sj-card--clickable:hover {
+    transform: none;
+  }
+}
