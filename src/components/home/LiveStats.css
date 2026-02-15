@@ -1,0 +1,66 @@
+/* 📊 LIVE STATS COMPONENT */
+
+.live-stats {
+  display: flex;
+  gap: var(--space-8);
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: var(--space-6);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.live-stat {
+  text-align: center;
+  min-width: 120px;
+}
+
+.live-stat__value {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: var(--font-extrabold);
+  color: white;
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.live-stat__label {
+  font-size: var(--text-sm);
+  color: var(--mist-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--font-semibold);
+}
+
+/* Pulse indicator for online players */
+.pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: var(--limoncello-yellow);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--limoncello-yellow);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+}
+
+@media (max-width: 768px) {
+  .live-stats {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+}
