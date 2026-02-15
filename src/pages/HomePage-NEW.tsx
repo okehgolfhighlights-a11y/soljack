@@ -6,7 +6,7 @@ import { LiveStats } from '../components/home/LiveStats';
 import { FeatureGrid } from '../components/home/FeatureGrid';
 import { RecentWinners } from '../components/home/RecentWinners';
 import { useMusicPlayer } from '../hooks/useGameAudio';
-import './HomePage.css';
+import './HomePage-New.css';
 
 interface HomePageProps {
   onPlayNow: () => void;
