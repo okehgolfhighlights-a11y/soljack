@@ -1,5 +1,5 @@
 // src/components/HomePage.tsx
-import { HomePage as NewHomePage } from '../fpages/HomePage-New';
+import { HomePage as NewHomePage } from '../pages/HomePage-New';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
