@@ -23,19 +23,19 @@ export const HomePage: React.FC<HomePageProps> = ({
 }) => {
   const [showRiva, setShowRiva] = useState(false);
   const music = useMusicPlayer();
-  
+
   // Show swimming Riva after page loads
   useEffect(() => {
     const timer = setTimeout(() => setShowRiva(true), 1000);
     return () => clearTimeout(timer);
   }, []);
-  
+
   // Start lobby music
   useEffect(() => {
     music.play();
     return () => music.pause();
   }, []);
-  
+
   return (
     <div className="homepage">
       {/* Hero Section with Coastal Background */}
@@ -49,23 +49,23 @@ export const HomePage: React.FC<HomePageProps> = ({
             </h1>
             <p className="hero-subtitle">RIVIERA</p>
           </div>
-          
+
           {/* Tagline */}
           <p className="hero-tagline">
             Mediterranean Luxury × Solana Blackjack
           </p>
-          
+
           {/* Swimming Riva */}
           {showRiva && (
             <div className="hero-riva">
-              <RivaMascot 
-                animation="swimming" 
+              <RivaMascot
+                animation="swimming"
                 size="large"
                 loop={true}
               />
             </div>
           )}
-          
+
           {/* CTA Buttons */}
           <div className="hero-actions">
             <PremiumButton
@@ -75,7 +75,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             >
               🎰 Play Now
             </PremiumButton>
-            
+
             <PremiumButton
               variant="secondary"
               size="lg"
@@ -84,7 +84,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               Learn More
             </PremiumButton>
           </div>
-          
+
           {/* Live Stats Counter */}
           <LiveStats
             totalPlayers={totalPlayers}
@@ -93,7 +93,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           />
         </div>
       </CoastalHero>
-      
+
       {/* Features Section */}
       <section className="homepage-section homepage-section--features">
         <div className="container">
@@ -103,18 +103,18 @@ export const HomePage: React.FC<HomePageProps> = ({
           <p className="section-subtitle">
             Experience the Mediterranean coast meets crypto culture
           </p>
-          
+
           <FeatureGrid />
         </div>
       </section>
-      
+
       {/* Game Modes */}
       <section className="homepage-section homepage-section--modes">
         <div className="container">
           <h2 className="section-title">
             🎮 Game Modes
           </h2>
-          
+
           <div className="game-modes">
             <div className="game-mode">
               <div className="game-mode__icon">🎯</div>
@@ -128,7 +128,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <li>Learn the ropes</li>
               </ul>
             </div>
-            
+
             <div className="game-mode game-mode--featured">
               <div className="game-mode__badge">⚡ POPULAR</div>
               <div className="game-mode__icon">🎰</div>
@@ -142,7 +142,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <li>10-second shot clock</li>
               </ul>
             </div>
-            
+
             <div className="game-mode">
               <div className="game-mode__icon">🏆</div>
               <h3 className="game-mode__title">Tournaments</h3>
@@ -158,7 +158,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      
+
       {/* Recent Winners */}
       <section className="homepage-section homepage-section--winners">
         <div className="container">
@@ -168,14 +168,14 @@ export const HomePage: React.FC<HomePageProps> = ({
           <RecentWinners />
         </div>
       </section>
-      
+
       {/* Mascot Section */}
       <section className="homepage-section homepage-section--mascot">
         <div className="container">
           <div className="mascot-showcase">
             <div className="mascot-showcase__riva">
-              <RivaMascot 
-                animation="lounging" 
+              <RivaMascot
+                animation="lounging"
                 size="large"
               />
             </div>
@@ -184,26 +184,26 @@ export const HomePage: React.FC<HomePageProps> = ({
                 Meet Riva, Your Sea Dragon Guide
               </h2>
               <p className="mascot-text">
-                Riva is the friendly Mediterranean sea dragon who'll guide you 
-                through your SolJack Riviera journey. From celebrating your wins 
-                to cheering you on through tough hands, Riva brings the coastal 
+                Riva is the friendly Mediterranean sea dragon who'll guide you
+                through your SolJack Riviera journey. From celebrating your wins
+                to cheering you on through tough hands, Riva brings the coastal
                 charm to every game.
               </p>
               <p className="mascot-text">
-                Unlock premium cosmetics to customize your experience and show 
+                Unlock premium cosmetics to customize your experience and show
                 off your style at the tables!
               </p>
             </div>
           </div>
         </div>
       </section>
-      
+
       {/* Final CTA */}
       <section className="homepage-section homepage-section--cta">
         <div className="container">
           <div className="final-cta">
-            <RivaMascot 
-              animation="waving" 
+            <RivaMascot
+              animation="waving"
               size="medium"
             />
             <h2 className="final-cta__title">
@@ -222,7 +222,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </div>
       </section>
-      
+
       {/* Footer */}
       <footer className="homepage-footer">
         <div className="container">
@@ -231,7 +231,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <h3>SolJack Riviera</h3>
               <p>Mediterranean luxury × Solana blackjack</p>
             </div>
-            
+
             <div className="footer-links">
               <div className="footer-column">
                 <h4>Game</h4>
@@ -241,7 +241,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <li><a href="/tournaments">Tournaments</a></li>
                 </ul>
               </div>
-              
+
               <div className="footer-column">
                 <h4>Community</h4>
                 <ul>
@@ -250,7 +250,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <li><a href="https://discord.gg/soljack" target="_blank">Discord</a></li>
                 </ul>
               </div>
-              
+
               <div className="footer-column">
                 <h4>Info</h4>
                 <ul>
@@ -261,7 +261,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className="footer-bottom">
             <p>© 2024 SolJack Riviera. Built on Solana.</p>
             <div className="footer-badges">
