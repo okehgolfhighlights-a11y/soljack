@@ -1,0 +1,463 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #e57373 0%, #ef9a9a 25%, #f48fb1 50%, #ce93d8 75%, #90caf9 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Wallet adapter button styles */
+.wallet-adapter-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 12px 24px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.wallet-adapter-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3) !important;
+}
+
+.wallet-adapter-button-trigger {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.7);
+}
+
+/* ===============================
+   SMOOTH CARD ANIMATION - NO FLASH
+   Cards start invisible and animate in
+   =============================== */
+
+@keyframes dealCard {
+  0% {
+    transform: translateY(-120px) scale(0.8);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(8px) scale(1.03);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0px) scale(1);
+    opacity: 1;
+  }
+}
+
+.sj-card-enter {
+  /* Start invisible */
+  opacity: 0;
+  /* Animate in smoothly */
+  animation: dealCard 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Stagger animation - slower spacing so you can see each card */
+.sj-card-enter:nth-child(1) {
+  animation-delay: 0ms;
+}
+
+.sj-card-enter:nth-child(2) {
+  animation-delay: 350ms;
+}
+
+.sj-card-enter:nth-child(3) {
+  animation-delay: 700ms;
+}
+
+.sj-card-enter:nth-child(4) {
+  animation-delay: 1050ms;
+}
+
+.sj-card-enter:nth-child(5) {
+  animation-delay: 1400ms;
+}
+
+.sj-card-enter:nth-child(6) {
+  animation-delay: 1750ms;
+}
+
+.sj-card-enter:nth-child(7) {
+  animation-delay: 2100ms;
+}
+
+/* ===============================
+   SHUFFLE OVERLAY & ANIMATION
+   =============================== */
+
+.sj-shuffle-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.sj-shuffle-popup {
+  background: linear-gradient(135deg, #2d5016 0%, #1a3a0f 100%);
+  border: 4px solid #ffd700;
+  border-radius: 20px;
+  padding: 50px 70px;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(255, 215, 0, 0.6);
+}
+
+.sj-shuffle-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: shuffleSpin 2s linear infinite;
+}
+
+@keyframes shuffleSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sj-shuffle-text {
+  font-size: 32px;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  margin-bottom: 12px;
+}
+
+.sj-shuffle-subtext {
+  font-size: 16px;
+  color: #fff;
+  opacity: 0.8;
+}
+
+/* ===============================
+   PUMP.FUN FLOATING BRANDING
+   =============================== */
+
+.sj-pumpfun-branding {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sj-meme-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes floaty {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.sj-meme-icon:nth-child(1) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.sj-meme-icon:nth-child(2) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+.sj-meme-icon:nth-child(3) {
+  animation: floaty 3s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+/* ===============================
+   CENTERED HAND LAYOUT
+   =============================== */
+
+.sj-hand-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-top: 12px;
+  min-height: 140px;
+}
+
+.sj-table-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+/* ===============================
+   CARD LAYOUT
+   =============================== */
+
+.sj-hand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.sj-card {
+  width: 72px;
+  height: 100px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sj-card-front,
+.sj-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  border-radius: 8px;
+}
+
+/* ===============================
+   TABLE LAYOUT
+   =============================== */
+
+.sj-table {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* ===============================
+   PLAYER / DEALER SECTIONS
+   =============================== */
+
+.sj-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.sj-section-title {
+  font-weight: 700;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 12px;
+}
+
+/* ===============================
+   TURN INDICATOR GLOW
+   =============================== */
+
+.sj-active-turn {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+  transition: box-shadow 0.3s ease;
+}
+
+.sj-inactive-turn {
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+/* ===============================
+   SCORE / MESSAGE STABILITY
+   =============================== */
+
+.sj-status {
+  min-height: 22px;
+  font-weight: 600;
+}
+
+.sj-score {
+  font-weight: 700;
+}
+
+/* ===============================
+   CONTROLS
+   =============================== */
+
+.sj-controls {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sj-controls button {
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sj-controls button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ===============================
+   DECK COUNTER
+   =============================== */
+
+.sj-deck-counter {
+  font-size: 16px;
+  font-weight: 600;
+  color: #90caf9;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* ===============================
+   TOURNAMENT PLAYER AVATAR
+   =============================== */
+
+.sj-player-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffd700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.sj-player-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===============================
+   ANIMATION SAFETY
+   =============================== */
+
+.sj-hand,
+.sj-card {
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+.sj-online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.sj-online-dot {
+  width: 8px;
+  height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+/* ===============================
+   BUST & BLACKJACK EFFECTS
+   =============================== */
+
+@keyframes bustPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(244, 67, 54, 0);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.6);
+  }
+}
+
+.sj-bust-effect {
+  animation: bustPulse 1s ease-out;
+}
+
+@keyframes blackjackFlash {
+  0%, 100% {
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+  }
+}
+
+.sj-blackjack-effect {
+  animation: blackjackFlash 0.8s ease-out;
+}
+
+/* Spinner animation for Lobby queue */
+@keyframes spin {
+  0% { 
+    transform: rotate(0deg); 
+  }
+  100% { 
+    transform: rotate(360deg); 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}

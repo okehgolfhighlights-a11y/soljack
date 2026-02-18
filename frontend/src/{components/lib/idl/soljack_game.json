@@ -1,0 +1,330 @@
+{
+  "version": "0.1.0",
+  "name": "soljack_game",
+  "instructions": [
+    {
+      "name": "createTable",
+      "accounts": [
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "betAmount",
+          "type": "u64"
+        },
+        {
+          "name": "role",
+          "type": {
+            "defined": "Role"
+          }
+        },
+        {
+          "name": "tableSeed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "joinTable",
+      "accounts": [
+        {
+          "name": "opponent",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "submitCommitment",
+      "accounts": [
+        {
+          "name": "player",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "commitment",
+          "type": {
+            "array": ["u8", 32]
+          }
+        }
+      ]
+    },
+    {
+      "name": "revealSeed",
+      "accounts": [
+        {
+          "name": "player",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "seed",
+          "type": {
+            "array": ["u8", 32]
+          }
+        }
+      ]
+    },
+    {
+      "name": "hit",
+      "accounts": [
+        {
+          "name": "player",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "stand",
+      "accounts": [
+        {
+          "name": "player",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tableAccount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "TableAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tableId",
+            "type": "u64"
+          },
+          {
+            "name": "betAmount",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
+            "name": "creatorRole",
+            "type": {
+              "defined": "Role"
+            }
+          },
+          {
+            "name": "opponent",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": "TableState"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "deck",
+            "type": {
+              "vec": "u8"
+            }
+          },
+          {
+            "name": "deckIndex",
+            "type": "u8"
+          },
+          {
+            "name": "creatorHand",
+            "type": {
+              "vec": "u8"
+            }
+          },
+          {
+            "name": "opponentHand",
+            "type": {
+              "vec": "u8"
+            }
+          },
+          {
+            "name": "creatorTotal",
+            "type": "u8"
+          },
+          {
+            "name": "opponentTotal",
+            "type": "u8"
+          },
+          {
+            "name": "currentTurn",
+            "type": {
+              "option": {
+                "defined": "Role"
+              }
+            }
+          },
+          {
+            "name": "turnDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "handNumber",
+            "type": "u32"
+          },
+          {
+            "name": "creatorCommitment",
+            "type": {
+              "option": {
+                "array": ["u8", 32]
+              }
+            }
+          },
+          {
+            "name": "opponentCommitment",
+            "type": {
+              "option": {
+                "array": ["u8", 32]
+              }
+            }
+          },
+          {
+            "name": "creatorSeedRevealed",
+            "type": {
+              "option": {
+                "array": ["u8", 32]
+              }
+            }
+          },
+          {
+            "name": "opponentSeedRevealed",
+            "type": {
+              "option": {
+                "array": ["u8", 32]
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "Role",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Dealer"
+          },
+          {
+            "name": "Player"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TableState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "Committing"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Settled"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidBetAmount",
+      "msg": "Invalid bet amount"
+    },
+    {
+      "code": 6001,
+      "name": "TableNotOpen",
+      "msg": "Table is not open"
+    },
+    {
+      "code": 6002,
+      "name": "TableFull",
+      "msg": "Table is full"
+    }
+  ]
+}
