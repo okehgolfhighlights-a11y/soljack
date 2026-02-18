@@ -1,0 +1,100 @@
+{
+  "version": "0.1.0",
+  "name": "username_registry",
+  "instructions": [
+    {
+      "name": "claimUsername",
+      "accounts": [
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "usernameAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "walletAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "feeDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "username",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "UsernameAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "username",
+            "type": "string"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WalletAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "username",
+            "type": "string"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidUsername",
+      "msg": "Username must be 3-20 alphanumeric characters"
+    },
+    {
+      "code": 6001,
+      "name": "UsernameTaken",
+      "msg": "Username already taken"
+    }
+  ]
+}
