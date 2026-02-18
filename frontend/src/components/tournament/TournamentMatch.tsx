@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardBack } from '../game/Card';
+import { Card, CardBack } from '../../assets/game/Card';
 import { TournamentFinalsTransition } from './TournamentFinalsTransition';
 import { useGameAudio } from '../../hooks/useGameAudio';
 import './TournamentMatch.css';

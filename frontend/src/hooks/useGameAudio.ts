@@ -1,8 +1,8 @@
 // Custom hooks for using audio in game components
 
 import { useCallback } from 'react';
-import { useAudio } from '../components/audio/AudioManager';
-import type { SoundEffect } from '../components/audio/AudioManager';
+import { useAudio } from '../assets/audio/AudioManager';
+import type { SoundEffect } from '../assets/audio/AudioManager';
 
 /**
  * Hook for game sound effects
